@@ -16,6 +16,7 @@ nav:
     - Aircraft Configuration: 'guides/configuration.md'
     - Contribution Strategy: 'guides/contribution.md'
     - Demand: 'guides/demand.md'
+  - Quick Reference: 'quick_reference.md'
   - Formulae: 'formulae.md'
   - API Reference:
     - Core:

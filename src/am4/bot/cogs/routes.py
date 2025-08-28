@@ -149,7 +149,7 @@ class ButtonHandler(discord.ui.View):
         await interaction.response.edit_message(view=self)
         df = pl.DataFrame({k[3:]: v for k, v in self.cols.items() if not (k.startswith("9"))})
         buf = io.BytesIO()
-        df.write_csv(buf)
+        df.write_csv(buf, include_bom=True)
         buf.seek(0)
         msg = await interaction.followup.send("Uploading...", wait=True)
         await msg.edit(

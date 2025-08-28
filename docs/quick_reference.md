@@ -2,25 +2,28 @@
 
 Quick reference manual. See the list of [mathematical formulae](./formulae.md) for more precise information.
 
+!!! example "Experimental"
+    This is a preview and still under development!
+
 ## Aircraft
 
 An aircraft is associated with many attributes. Among the most important are:
 
 - Maximum Range $R$: affects the frequency of departures and your access to more destinations.
-- Engine Variant*: applies a multiplier on the *base* speed, fuel and CO<sub>2</sub> consumption values.
-- Cruise Speed $V$*: ground speed of the aircraft, constant from the takeoff to final approach phase. can be increased with [modifications]()
-- Fuel Consumption $c_T$*: can be decreased with [modifications]() and [training points]()
-- CO2 Consumption $c_C$*: can be decreased with [modifications]() and [training points]()
+- Engine Variant<sup>†</sup>: applies a multiplier on the *base* speed, fuel and CO<sub>2</sub> consumption values.
+- Cruise Speed $V$<sup>†</sup>: ground speed of the aircraft, constant from the takeoff to final approach phase. can be increased with [modifications]()
+- Fuel Consumption $c_T$<sup>†</sup>: can be decreased with [modifications]() and [training points]()
+- CO2 Consumption $c_C$<sup>†</sup>: can be decreased with [modifications]() and [training points]()
 - Capacity $C$: the maximum *units* of passengers or cargo, for use in [aircraft configuration](#aircraft-configuration).
 - Minimum Runway Length $L_\text{rwy,min}$: [restricts](#constraints) the route choices for realism players
 
-\* A common question is the discrepancy between aircraft specifications in the menu page and the detailed order page. The menu page lists the *base* specifications - clicking into the detailed order page applies a multiplier (typically 0.95-1.05) to the base specifications.
+<sup>†</sup> A common question is the discrepancy between aircraft specifications in the menu page and the detailed order page. The menu page lists the *base* specifications - clicking into the detailed order page applies a multiplier (typically 0.95-1.05) to the base specifications.
 
-The list of aircrafts can be downloaded [here]().
+The list of aircrafts can be downloaded [here](https://github.com/abc8747/am4/releases/download/v0.1.10/aircrafts.parquet).
 
 ## Airport
 
-The list of airports can be downloaded [here]().
+The list of airports can be downloaded [here](https://github.com/abc8747/am4/releases/download/v0.1.10/airports.parquet).
 
 ## Routing
 
@@ -51,13 +54,13 @@ An aircraft has $C$ units of capacity and can be customised.
 
 Certain seat classes take up more "empty space" of the aircraft:
 
-| Seat class | Units of capacity |
-|-|-|
-| Economy $y$ | 1 |
-| Business $j$ | 2 |
-| First $f$ | 3 |
-| Large cargo $l$ | 0.7 |
-| Heavy cargo $h$ | 1 |
+| Seat class      | Units of capacity |
+| --------------- | ----------------- |
+| Economy $y$     | 1                 |
+| Business $j$    | 2                 |
+| First $f$       | 3                 |
+| Large cargo $l$ | 0.7               |
+| Heavy cargo $h$ | 1                 |
 
 The weighted sum of seats should add up to the capacity. For example, an A380-800 has $C=600$ units of capacity, and a valid configuration can be $s_y=100$, $s_j=100$ and $s_f=100$ because their weighted sum is $1 \cdot 100+2\cdot 100 + 3\cdot 100=600$.
 
@@ -76,13 +79,13 @@ In practice, a higher revenue per flight can be achieved by multiplying the auto
 
 The cost is a *psuedo*random value sampled from a uniform distribution, $300-$3000, updated every 30 minutes.
 
-Fuel bonanzas with <$100 may occur, though it is extremely rare.
+Fuel bonanzas with <$100 may occur when Dev is having fun.
 
 ### CO2
 
 The cost is a *psuedo*random value sampled from a uniform distribution, $100-$200, updated every 30 minutes.
 
-CO2 bonanzas with $10 may occur, though it is extremely rare.
+CO2 bonanzas with $10 may occur when Dev is having fun.
 
 ### Cost index
 

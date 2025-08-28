@@ -1,6 +1,6 @@
 By Cathay Express, Star Alliance and other contributors.
 
-Last major revision: 7 Jul 2021, last updated: 22 Aug 2024
+Last major revision: 7 Jul 2021, last updated: 28 Aug 2025
 
 If you have any suggestions or error corrections, open an
 [issue](https://github.com/abc8747/am4/issues) or contact me via our
@@ -765,6 +765,43 @@ where:
 ___
 
 ## Miscellaneous
+
+### XP (departing aircraft)
+
+**Note**: Prior to May 2025, the XP awarded is fixed for every single departure, regardless of the route distance. This mechanic was superseded by a more complex formula intended to counter against TP farming.
+
+Found: July 11 2025 (Cathay Express, data contributed by Burianto)
+
+Confidence: <span class="c-good">90%</span>
+
+$$
+\begin{align*}
+\text{load factor} &= \frac{\begin{cases}
+y_l + 2 j_l + 3 f_l &\text{if pax} \\
+\frac{1}{0.7}l_l + h_l &\text{if cargo}
+\end{cases}}{\text{capacity}} \\
+\mathrm{xp} &= \frac{\mathrm{round}(a + \text{load factor} + b d + c, 5)}{2l + 1}
+\end{align*}
+$$
+
+where:
+
+- $y_l$, $j_l$, $f_l$ are the number of economy, business, and first class passenger loaded
+- $l_l$, $h_l$: actual load of large and heavy cargo (lbs)
+- $d$: total distance[^1] of the flight.
+- $l$: current level number
+- $a$, $b$, $c$: coefficients
+
+|            | $a$   | $b$    | $c$ |
+| ---------- | ----- | ------ | --- |
+| global7500 | 59.5  | 0.0114 | -46 |
+| mc214      | 52.5  | 0.0089 | -38 |
+| a388       | 120.8 | 0.0123 | -82 |
+| b748       | 122.7 | 0.0110 | -80 |
+
+!!! note
+    these values are approximate (fitted from data) and will expand as more data comes in.
+
 
 ### Level Bar
 
