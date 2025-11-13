@@ -88,7 +88,7 @@ impl<R, C> Routes<'_, R, C> {
     }
 
     /// Get details about routing failures (e.g. insufficient range, runway too short etc.)
-    pub fn errors(&self) -> &[FailedRoute] {
+    pub fn errors(&self) -> &[FailedRoute<'_>] {
         &self.errors
     }
 

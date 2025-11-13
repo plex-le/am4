@@ -256,7 +256,7 @@ const uint16_t missing_acids[] = {54,  57,  65,  70,  77,  78,  79,  80,  81,  8
                                   261, 262, 263, 264, 265, 278, 279, 280, 286, 296, 297, 301, 319, 354};
 Aircraft Database::get_aircraft_by_id(uint16_t id, uint8_t priority) {
     if (std::find(std::begin(missing_acids), std::end(missing_acids), id) != std::end(missing_acids)) return Aircraft();
-    if (id > 382) return Aircraft();
+    if (id > 384) return Aircraft();
     return aircrafts[Database::get_aircraft_idx_by_id(id, priority)];
 }
 
