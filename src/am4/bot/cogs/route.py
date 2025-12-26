@@ -7,7 +7,7 @@ from am4.utils.route import AircraftRoute, Route, SameOdException
 
 from ...config import cfg
 from ..base import BaseCog
-from ..converters import AircraftCvtr, AirportCvtr, CfgAlgCvtr, TPDCvtr
+from ..converters import AircraftCvtr, AirportCvtr, CfgAlgCvtr, Constraint, RouteConstraintCvtr, TPDCvtr
 from ..errors import CustomErrHandler
 from ..utils import (
     COLOUR_ERROR,
@@ -27,6 +27,12 @@ from ..utils import (
 HELP_AP_ARG0 = "**Origin airport query**\nLearn more using `$help airport`."
 HELP_AP_ARG1 = "**Destination airport query**\nLearn more using `$help airport`."
 HELP_AC_ARG0 = "**Aircraft query**\nLearn more about how to customise engine/modifiers using `$help aircraft`."
+HELP_CONSTRAINT = (
+    "**Constraint**\n"
+    "The target distance (km) or flight time (HH:MM).\n"
+    "- `16000`: pick stopovers so route distance is almost, but less than 16,000 km\n"
+    "- `12:00`: adjust CI so flight time is almost, but less than 12 hours\n"
+)
 
 
 def format_additional(
@@ -82,6 +88,12 @@ class RouteCog(BaseCog):
             displayed_default="AUTO",
             description=HELP_CFG_ALG,
         ),
+        constraint: Constraint = commands.parameter(
+            converter=RouteConstraintCvtr,
+            default=RouteConstraintCvtr._default,
+            displayed_default="NONE",
+            description=HELP_CONSTRAINT,
+        ),
     ):
         if ac_query is None:
             try:
@@ -100,7 +112,23 @@ class RouteCog(BaseCog):
         is_cargo = ac_query.ac.type == Aircraft.Type.CARGO
         tpd, tpd_mode = trips_per_day_per_ac
 
-        options = AircraftRoute.Options(trips_per_day_per_ac=tpd, tpd_mode=tpd_mode, config_algorithm=config_algorithm)
+        options = AircraftRoute.Options(
+            **{
+                k: v
+                for k, v in {
+                    "trips_per_day_per_ac": tpd,
+                    "tpd_mode": tpd_mode,
+                    "config_algorithm": config_algorithm,
+                    "max_distance": constraint.max_distance,
+                    "min_distance": constraint.min_distance,
+                    "max_flight_time": constraint.max_flight_time,
+                    "min_flight_time": constraint.min_flight_time,
+                    "inflate_distance_with_stopover": constraint.inflate_distance_with_stopover,
+                    "inflate_flight_time_with_ci": constraint.inflate_flight_time_with_ci,
+                }.items()
+                if v is not None
+            }
+        )
         u, _ue = await fetch_user_info(ctx)
         if (
             u.game_mode == u.GameMode.REALISM
@@ -121,13 +149,15 @@ class RouteCog(BaseCog):
 
         sa = acr.stopover.airport
         stopover_f = f"{format_ap_short(sa, mode=1)}\n" if acr.stopover.exists else ""
-        distance_f = (
-            f"{acr.stopover.full_distance:.3f} km (+{acr.stopover.full_distance - acr.route.direct_distance:.3f} km)"
-            if acr.stopover.exists
-            else f"{acr.route.direct_distance:.3f} km (direct)"
-        )
+        if acr.stopover.exists:
+            added_dist = acr.stopover.full_distance - acr.route.direct_distance
+            added_frac = added_dist / acr.route.direct_distance
+            distance_f = f"{acr.stopover.full_distance:.3f} km (+{added_dist:.3f} km, +{added_frac:.1%})"
+        else:
+            distance_f = f"{acr.route.direct_distance:.3f} km (direct)"
+        ci_f = f" (CI={acr.ci})" if acr.ci != 200 else ""
         description = (
-            f"**Flight Time**: {format_flight_time(acr.flight_time)} ({acr.flight_time:.3f} hr)\n"
+            f"**Flight Time**: {format_flight_time(acr.flight_time)} ({acr.flight_time:.3f} hr){ci_f}\n"
             f"**  Schedule**: {acr.trips_per_day_per_ac:.0f} trips/day/ac × {acr.num_ac} A/C needed\n"
             f"**  Demand**: {format_demand(acr.route.pax_demand, is_cargo)}\n"
             f"**  Config**: {format_config(acr.config)}\n"
@@ -192,6 +222,7 @@ class RouteCog(BaseCog):
         await h.invalid_aircraft()
         await h.invalid_tpd()
         await h.invalid_cfg_alg()
+        await h.invalid_constraint()
 
         await h.banned_user()
         await h.too_many_args("argument")

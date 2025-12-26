@@ -56,6 +56,8 @@ HELP_CONSTRAINT = (
     "- `08:00..12:00`: flight time between 8 and 12 hours\n"
     "- `12:00..`: flight time of at least 12 hours\n"
     "- `..16000`: same as `16000`\n"
+    "- `16000!`: force stopover to inflate distance to be almost, but less than 16000 km\n"
+    "- `12:00!`: adjust CI so flight time is almost, but less than 12 hours\n"
     "When a constraint is given, routes are sorted by profit per trip. Otherwise, by profit per day."
 )
 
@@ -66,16 +68,23 @@ def add_data(is_multi_hub: bool, o: Airport, d: Destination, is_cargo: bool, emb
     profit_per_day_per_ac = acr.profit * acr.trips_per_day_per_ac
     origin_f = f"{format_ap_short(o, mode=0)}\n" if is_multi_hub else ""
     stopover_f = f"{format_ap_short(acr.stopover.airport, mode=1)}\n" if acr.stopover.exists else ""
-    distance_f = f"{acr.stopover.full_distance if acr.stopover.exists else acr.route.direct_distance:.0f} km"
+    if acr.stopover.exists:
+        added_dist = acr.stopover.full_distance - acr.route.direct_distance
+        added_pct = added_dist / acr.route.direct_distance * 100
+        distance_f = f"{acr.stopover.full_distance:.0f} km"
+        detour_str = f", +{added_pct:.1f}%" if added_pct >= 0.001 else ""
+    else:
+        distance_f, detour_str = f"{acr.route.direct_distance:.0f} km", ""
     flight_time_f = format_flight_time(acr.flight_time)
     num_ac_f = f"**__{acr.num_ac} ac__**" if acr.num_ac > 1 else f"{acr.num_ac} ac"
+    ci_f = f", CI={acr.ci}" if acr.ci != 200 else ""
     embed.add_field(
         name=f"{origin_f}{stopover_f}{format_ap_short(d.airport, mode=2)}",
         value=(
             f"**Demand**: {format_demand(acr.route.pax_demand, is_cargo)}\n"
             f"**  Config**: {format_config(acr.config)}\n"
             f"**  Tickets**: {format_ticket(acr.ticket)}\n"
-            f"** Details**: {distance_f} ({flight_time_f}), C$ {acr.contribution:.1f}/t\n"
+            f"** Details**: {distance_f} ({flight_time_f}{detour_str}), C$ {acr.contribution:.1f}/t{ci_f}\n"
             f"     {acr.trips_per_day_per_ac} t/d/ac × {num_ac_f}\n"
             f"** Profit**: $ {acr.profit:,.0f}/t, $ {profit_per_day_per_ac:,.0f}/d/ac\n"
         ),
@@ -276,6 +285,8 @@ class RoutesCog(BaseCog):
                         if cons_set
                         else AircraftRoute.Options.SortBy.PER_TRIP
                     ),
+                    "inflate_distance_with_stopover": constraint.inflate_distance_with_stopover,
+                    "inflate_flight_time_with_ci": constraint.inflate_flight_time_with_ci,
                 }.items()
                 if v is not None
             }
@@ -385,12 +396,25 @@ class RoutesCog(BaseCog):
         tpd_set: bool,
         game_mode: User.GameMode,
     ):
-        cons_eq_t = (
-            max_distance / ac_query.ac.speed / (1.5 if game_mode == User.GameMode.EASY else 1)
-            if max_distance is not None
-            else max_flight_time
-        )
-        cons_eq_f = (f"`{max_distance}`km, equivalent to " if max_distance else "") + f"max `{cons_eq_t:.2f}` hr"
+        speed = ac_query.ac.speed * (1.5 if game_mode == User.GameMode.EASY else 1)
+        t_from_dist = max_distance / speed if max_distance is not None else 0
+        t_from_time = max_flight_time if max_flight_time is not None else 0
+        cons_eq_t = max(t_from_dist, t_from_time)
+
+        cons_eq_f_parts = []
+        if max_distance is not None:
+            cons_eq_f_parts.append(f"`{max_distance}`km")
+        if max_flight_time is not None:
+            cons_eq_f_parts.append(f"`{max_flight_time:.2f}`hr")
+
+        cons_eq_f = ", ".join(cons_eq_f_parts)
+        if max_distance is not None and max_flight_time is None:
+            cons_eq_f += f", equivalent to max `{t_from_dist:.2f}` hr"
+        elif max_distance is None and max_flight_time is not None:
+            cons_eq_f = f"max `{max_flight_time:.2f}` hr"
+        elif max_distance is not None and max_flight_time is not None:
+            cons_eq_f += f", effective max `{cons_eq_t:.2f}` hr"
+
         sugg_cons_t, sugg_tpd = 24 / tpd, math.floor(24 / cons_eq_t)
         if (t_ttl := cons_eq_t * tpd) > 24 and tpd_set:
             embed = discord.Embed(

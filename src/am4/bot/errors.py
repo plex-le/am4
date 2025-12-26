@@ -245,7 +245,11 @@ class CustomErrHandler:
     async def invalid_constraint(self):
         if not isinstance(self.error, ConstraintValidationError):
             return
-        as_time = self.error.err.errors()[0]["type"] == "time_delta_parsing"
+
+        as_time = False
+        if isinstance(self.error.err, ValidationError):
+            as_time = self.error.err.errors()[0]["type"] == "time_delta_parsing"
+
         extra = (
             "note: time constraints must be in `HH:MM` format."
             if as_time

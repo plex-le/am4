@@ -78,6 +78,8 @@ class AircraftRoute:
         config_algorithm: (
             None | am4.utils.aircraft.Aircraft.PaxConfig.Algorithm | am4.utils.aircraft.Aircraft.CargoConfig.Algorithm
         )
+        inflate_distance_with_stopover: bool
+        inflate_flight_time_with_ci: bool
         sort_by: AircraftRoute.Options.SortBy
         tpd_mode: AircraftRoute.Options.TPDMode
         def __init__(
@@ -86,13 +88,14 @@ class AircraftRoute:
             trips_per_day_per_ac: typing.SupportsInt = 1,
             max_distance: typing.SupportsFloat = 20015.086796020572,
             min_distance: typing.SupportsFloat = 0.0,
-            max_flight_time: typing.SupportsFloat = 24.0,
+            max_flight_time: typing.SupportsFloat = -1.0,
             min_flight_time: typing.SupportsFloat = 0.0,
             config_algorithm: None
             | am4.utils.aircraft.Aircraft.PaxConfig.Algorithm
             | am4.utils.aircraft.Aircraft.CargoConfig.Algorithm = None,
             sort_by: AircraftRoute.Options.SortBy = SortBy.PER_TRIP,
-            force_distance_inflation: bool = False,
+            inflate_distance_with_stopover: bool = False,
+            inflate_flight_time_with_ci: bool = False,
         ) -> None: ...
         @property
         def max_distance(self) -> float: ...
@@ -122,6 +125,14 @@ class AircraftRoute:
             destination: am4.utils.airport.Airport,
             aircraft: am4.utils.aircraft.Aircraft,
             game_mode: am4.utils.game.User.GameMode,
+        ) -> AircraftRoute.Stopover: ...
+        @staticmethod
+        def find_by_target_distance_lt(
+            origin: am4.utils.airport.Airport,
+            destination: am4.utils.airport.Airport,
+            aircraft: am4.utils.aircraft.Aircraft,
+            game_mode: am4.utils.game.User.GameMode,
+            target_distance: typing.SupportsFloat,
         ) -> AircraftRoute.Stopover: ...
         def __repr__(self) -> str: ...
         def to_dict(self) -> dict: ...

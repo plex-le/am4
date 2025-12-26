@@ -149,19 +149,41 @@ class Constraint(NamedTuple):
     max_distance: float | None
     min_flight_time: float | None
     max_flight_time: float | None
+    inflate_distance_with_stopover: bool = False
+    inflate_flight_time_with_ci: bool = False
 
 
 class ConstraintCvtr(commands.Converter):
     _default = Constraint(None, None, None, None)
 
-    def _parse_one(self, value: str) -> tuple[float | None, float | None]:
+    def _parse_one(self, value: str) -> tuple[float | None, float | None, bool, bool]:
+        inflate_distance_with_stopover = False
+        inflate_flight_time_with_ci = False
+        has_exclamation = False
+
+        while True:
+            if value.endswith("!"):
+                value = value[:-1]
+                has_exclamation = True
+                continue
+            break
+
         try:
             dist_parsed = acro_cast("max_distance", value).max_distance
-            return dist_parsed, None
+            if has_exclamation:
+                inflate_distance_with_stopover = True
+            return dist_parsed, None, inflate_distance_with_stopover, inflate_flight_time_with_ci
         except ValidationError:
             try:
                 time_parsed = acro_cast("max_flight_time", value).max_flight_time
-                return None, time_parsed.total_seconds() / 3600
+                if has_exclamation:
+                    inflate_flight_time_with_ci = True
+                return (
+                    None,
+                    time_parsed.total_seconds() / 3600,
+                    inflate_distance_with_stopover,
+                    inflate_flight_time_with_ci,
+                )
             except ValidationError as e:
                 raise ConstraintValidationError(e)
 
@@ -170,17 +192,52 @@ class ConstraintCvtr(commands.Converter):
         if constraint == "none":
             return self._default
 
-        separator = ".."
-        if separator in constraint:
-            parts = [p.strip() for p in constraint.split(separator, 1)]
-            min_val_str, max_val_str = parts[0] or None, parts[1] or None
-        else:
-            min_val_str, max_val_str = None, constraint
+        parts = constraint.split("+")
 
-        min_dist, min_time = self._parse_one(min_val_str) if min_val_str else (None, None)
-        max_dist, max_time = self._parse_one(max_val_str) if max_val_str else (None, None)
+        min_dist, max_dist = None, None
+        min_time, max_time = None, None
+        inflate_dist_with_stopover, inflate_flight_time_with_ci = False, False
 
-        return Constraint(min_dist, max_dist, min_time, max_time)
+        for part in parts:
+            separator = ".."
+            if separator in part:
+                subparts = [p.strip() for p in part.split(separator, 1)]
+                min_val_str, max_val_str = subparts[0] or None, subparts[1] or None
+            else:
+                min_val_str, max_val_str = None, part
+
+            p_min_dist, p_min_time, _, _ = self._parse_one(min_val_str) if min_val_str else (None, None, False, False)
+            p_max_dist, p_max_time, p_inflate_dist, p_optimise_ci = (
+                self._parse_one(max_val_str) if max_val_str else (None, None, False, False)
+            )
+
+            if p_min_dist is not None:
+                min_dist = p_min_dist
+            if p_max_dist is not None:
+                max_dist = p_max_dist
+            if p_min_time is not None:
+                min_time = p_min_time
+            if p_max_time is not None:
+                max_time = p_max_time
+            if p_inflate_dist:
+                inflate_dist_with_stopover = True
+            if p_optimise_ci:
+                inflate_flight_time_with_ci = True
+
+        if inflate_flight_time_with_ci and max_time is None:
+            if max_dist is None:
+                pass  # should be caught by validation error in _parse_one if nothing parsed
+            elif not inflate_dist_with_stopover:
+                raise ConstraintValidationError(
+                    PydanticCustomError(
+                        "invalid_constraint",
+                        "Cannot use `!ci` with distance constraint unless `!d` is also specified.",
+                    )
+                )
+
+        return Constraint(
+            min_dist, max_dist, min_time, max_time, inflate_dist_with_stopover, inflate_flight_time_with_ci
+        )
 
 
 class _Price(BaseModel):
@@ -221,3 +278,38 @@ class PriceCvtr(commands.Converter):
             "co2": "CO₂",
         }
         return k_formatted.get(k), getattr(v_new, k)
+
+
+class RouteConstraintCvtr(commands.Converter):
+    _default = Constraint(None, None, None, None, False, False)
+
+    async def convert(self, ctx: commands.Context, constraint: str) -> Constraint:
+        constraint = constraint.strip().lower()
+        if constraint == "none":
+            return self._default
+
+        parts = constraint.split("+")
+        max_dist = None
+        max_time = None
+        inflate_dist = False
+        optimise_ci = False
+
+        for part in parts:
+            part = part.strip()
+            try:
+                dist_parsed = acro_cast("max_distance", part).max_distance
+                max_dist = dist_parsed
+                inflate_dist = True
+                continue
+            except ValidationError:
+                pass
+
+            try:
+                time_parsed = acro_cast("max_flight_time", part).max_flight_time
+                max_time = time_parsed.total_seconds() / 3600
+                optimise_ci = True
+                continue
+            except ValidationError as e:
+                raise ConstraintValidationError(e)
+
+        return Constraint(None, max_dist, None, max_time, inflate_dist, optimise_ci)

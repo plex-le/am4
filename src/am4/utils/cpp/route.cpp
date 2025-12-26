@@ -190,7 +190,9 @@ AircraftRoute::Options::Options(
     float max_flight_time,
     float min_flight_time,
     ConfigAlgorithm config_algorithm,
-    SortBy sort_by
+    SortBy sort_by,
+    bool inflate_distance_with_stopover,
+    bool inflate_flight_time_with_ci
 )
     : tpd_mode(tpd_mode),
       trips_per_day_per_ac(trips_per_day_per_ac),
@@ -199,7 +201,9 @@ AircraftRoute::Options::Options(
       max_flight_time(max_flight_time),
       min_flight_time(min_flight_time),
       config_algorithm(config_algorithm),
-      sort_by(sort_by) {
+      sort_by(sort_by),
+      inflate_distance_with_stopover(inflate_distance_with_stopover),
+      inflate_flight_time_with_ci(inflate_flight_time_with_ci) {
     if (tpd_mode == AircraftRoute::Options::TPDMode::AUTO && trips_per_day_per_ac != 1)
         std::cerr << "WARN: trips_per_day_per_ac is ignored when tpd_mode is AUTO" << std::endl;
 };
@@ -210,6 +214,17 @@ AircraftRoute AircraftRoute::create(
     acr.route = Route::create(a0, a1);
     acr._ac_type = ac.type;
     acr.max_tpd = std::nullopt;
+
+    double game_mode_speed_multiplier = user.game_mode == User::GameMode::EASY ? 1.5 : 1.0;
+
+    float max_flight_time = options.max_flight_time;
+    if (max_flight_time < 0) {
+        if (options.max_distance < MAX_DISTANCE) {
+            max_flight_time = static_cast<float>(options.max_distance) / (ac.speed * game_mode_speed_multiplier);
+        } else {
+            max_flight_time = 24.0f;
+        }
+    }
 
     if (user.game_mode == User::GameMode::REALISM && (a1.rwy < ac.rwy)) {
         // NOTE: departing from runways that are too short is actually allowed
@@ -232,8 +247,16 @@ AircraftRoute AircraftRoute::create(
     } else if (acr.route.direct_distance < 1000) {
         acr.warnings.push_back(AircraftRoute::Warning::REDUCED_CONTRIBUTION);
     }
-    acr.needs_stopover = acr.route.direct_distance > ac.range;
-    acr.stopover = acr.needs_stopover ? Stopover::find_by_efficiency(a0, a1, ac, user.game_mode) : Stopover();
+    acr.needs_stopover = acr.route.direct_distance > ac.range || options.inflate_distance_with_stopover;
+    if (options.inflate_distance_with_stopover) {
+        double target_distance = options.max_distance;
+        if (options.max_distance >= MAX_DISTANCE && max_flight_time < 24.0f) {
+            target_distance = static_cast<double>(max_flight_time) * ac.speed * game_mode_speed_multiplier;
+        }
+        acr.stopover = Stopover::find_by_target_distance_lt(a0, a1, ac, user.game_mode, target_distance);
+    } else {
+        acr.stopover = acr.needs_stopover ? Stopover::find_by_efficiency(a0, a1, ac, user.game_mode) : Stopover();
+    }
     if (acr.needs_stopover && !acr.stopover.exists) {
         acr.warnings.push_back(AircraftRoute::Warning::ERR_NO_STOPOVER);
         return acr;
@@ -247,9 +270,22 @@ AircraftRoute AircraftRoute::create(
         acr.warnings.push_back(AircraftRoute::Warning::ERR_DISTANCE_BELOW_SPECIFIED);
         return acr;
     }
-    acr.flight_time =
-        static_cast<float>(full_distance) / (ac.speed * (user.game_mode == User::GameMode::EASY ? 1.5f : 1.0f));
-    if (acr.flight_time > options.max_flight_time) {
+    acr.flight_time = static_cast<float>(full_distance) / (ac.speed * game_mode_speed_multiplier);
+
+    acr.ci = 200;
+    if (options.inflate_flight_time_with_ci && acr.flight_time < max_flight_time) {
+        double u = ac.speed * game_mode_speed_multiplier;
+        double target_time = max_flight_time;
+        double ci_val = (2000.0 * full_distance) / (7.0 * u * target_time) - (600.0 / 7.0);
+        if (ci_val < 0) ci_val = 0;
+        if (ci_val > 200) ci_val = 200;
+        acr.ci = static_cast<uint8_t>(ceil(ci_val));
+
+        double v = u * (0.0035 * acr.ci + 0.3);
+        acr.flight_time = static_cast<float>(full_distance / v);
+    }
+
+    if (acr.flight_time > max_flight_time) {
         acr.warnings.push_back(AircraftRoute::Warning::ERR_FLIGHT_TIME_ABOVE_SPECIFIED);
         return acr;
     } else if (acr.flight_time < options.min_flight_time) {
@@ -265,34 +301,32 @@ AircraftRoute AircraftRoute::create(
         case Aircraft::Type::PAX: {
             acr.update_pax_details<false>(static_cast<uint16_t>(ac.capacity), options, user);
             if (!acr.valid) return acr;
-            acr.co2 = AircraftRoute::calc_co2(ac, get<Aircraft::PaxConfig>(acr.config), full_distance, user);
+            acr.co2 = AircraftRoute::calc_co2(ac, get<Aircraft::PaxConfig>(acr.config), full_distance, user, acr.ci);
             break;
         }
         case Aircraft::Type::CARGO: {
             acr.update_cargo_details(static_cast<uint32_t>(ac.capacity), options, user);
             if (!acr.valid) return acr;
-            acr.co2 = AircraftRoute::calc_co2(ac, get<Aircraft::CargoConfig>(acr.config), full_distance, user);
+            acr.co2 = AircraftRoute::calc_co2(ac, get<Aircraft::CargoConfig>(acr.config), full_distance, user, acr.ci);
             break;
         }
         case Aircraft::Type::VIP: {
             acr.update_pax_details<true>(static_cast<uint16_t>(ac.capacity), options, user);
             if (!acr.valid) return acr;
-            acr.co2 = AircraftRoute::calc_co2(ac, get<Aircraft::PaxConfig>(acr.config), full_distance, user);
+            acr.co2 = AircraftRoute::calc_co2(ac, get<Aircraft::PaxConfig>(acr.config), full_distance, user, acr.ci);
             break;
         }
     }
-    acr.fuel = AircraftRoute::calc_fuel(ac, full_distance, user);
+    acr.fuel = AircraftRoute::calc_fuel(ac, full_distance, user, acr.ci);
     acr.acheck_cost = static_cast<float>(ac.check_cost * (user.game_mode == User::GameMode::EASY ? 0.5 : 1.0)) *
-                      ceil(acr.flight_time * (user.game_mode == User::GameMode::EASY ? 1.5 : 1.0)) /
-                      static_cast<float>(ac.maint);
+                      ceil(acr.flight_time * game_mode_speed_multiplier) / static_cast<float>(ac.maint);
     acr.repair_cost =
         ac.cost / 1000.0 * 0.0075 *
         (1 - 2 * user.repair_training / 100.0);  // each flight adds random [0, 1.5]% wear, each tp decreases wear by 2%
     acr.profit =
         (acr.income - acr.fuel * user.fuel_price / 1000.0 - acr.co2 * user.co2_price / 1000.0 - acr.acheck_cost -
          acr.repair_cost);
-    acr.ci = 200;
-    acr.contribution = AircraftRoute::calc_contribution(full_distance, user, 200);
+    acr.contribution = AircraftRoute::calc_contribution(full_distance, user, acr.ci);
 
     acr.valid = true;
     return acr;
@@ -338,6 +372,59 @@ AircraftRoute::Stopover AircraftRoute::Stopover::find_by_efficiency(
             if (d_o + d_d < candidate_distance) {
                 candidate = ap;
                 candidate_distance = d_o + d_d;
+            }
+        }
+    }
+
+    if (!candidate.valid) return Stopover();
+    return Stopover(candidate, candidate_distance);
+}
+
+AircraftRoute::Stopover AircraftRoute::Stopover::find_by_target_distance_lt(
+    const Airport& origin,
+    const Airport& destination,
+    const Aircraft& aircraft,
+    User::GameMode game_mode,
+    double target_distance
+) {
+    const auto& db = Database::Client();
+    const auto& airports = db->airports;
+    const auto& distances = db->distances;
+    Airport candidate = Airport();
+    double candidate_distance = 0;
+
+    const double ac_range = static_cast<double>(aircraft.range);
+    const uint16_t o_idx = db->airport_id_hashtable[origin.id];
+    const uint16_t d_idx = db->airport_id_hashtable[destination.id];
+
+    if (game_mode == User::GameMode::EASY) {
+        for (uint16_t idx = 0; idx < AIRPORT_COUNT; idx++) {
+            const Airport& ap = airports[idx];
+            const double d_o = distances[o_idx][idx];
+            if (d_o > ac_range || d_o < 100.0) continue;
+            const double d_d = distances[d_idx][idx];
+            if (d_d > ac_range || d_d < 100.0) continue;
+
+            double dist = d_o + d_d;
+            if (dist <= target_distance && dist > candidate_distance) {
+                candidate = ap;
+                candidate_distance = dist;
+            }
+        }
+    } else {
+        const uint16_t rwy_requirement = aircraft.rwy;
+        for (uint16_t idx = 0; idx < AIRPORT_COUNT; idx++) {
+            const Airport& ap = airports[idx];
+            if (ap.rwy < rwy_requirement) continue;
+            const double d_o = distances[o_idx][idx];
+            if (d_o > ac_range || d_o < 100.0) continue;
+            const double d_d = distances[d_idx][idx];
+            if (d_d > ac_range || d_d < 100.0) continue;
+
+            double dist = d_o + d_d;
+            if (dist <= target_distance && dist > candidate_distance) {
+                candidate = ap;
+                candidate_distance = dist;
             }
         }
     }
@@ -540,7 +627,9 @@ std::vector<Destination> RoutesSearch::get_sell() const {
             float flight_time = static_cast<float>(dist / this->aircraft.speed);
             if (this->user.game_mode == User::GameMode::EASY) flight_time *= 1.5f;
 
-            if (flight_time > this->options.max_flight_time || flight_time < this->options.min_flight_time) continue;
+            if ((this->options.max_flight_time > 0 && flight_time > this->options.max_flight_time) ||
+                flight_time < this->options.min_flight_time)
+                continue;
 
             AircraftRoute ar;
             ar.route.direct_distance = dist;
@@ -809,11 +898,12 @@ void pybind_init_route(py::module_& m) {
         .def(
             py::init<
                 AircraftRoute::Options::TPDMode, uint16_t, double, double, float, float,
-                AircraftRoute::Options::ConfigAlgorithm, AircraftRoute::Options::SortBy>(),
+                AircraftRoute::Options::ConfigAlgorithm, AircraftRoute::Options::SortBy, bool, bool>(),
             py::arg_v("tpd_mode", AircraftRoute::Options::TPDMode::AUTO, "TPDMode.AUTO"), "trips_per_day_per_ac"_a = 1,
-            "max_distance"_a = MAX_DISTANCE, "min_distance"_a = 0.0, "max_flight_time"_a = 24.0f,
+            "max_distance"_a = MAX_DISTANCE, "min_distance"_a = 0.0, "max_flight_time"_a = -1.0f,
             "min_flight_time"_a = 0.0f, "config_algorithm"_a = std::monostate(),
-            py::arg_v("sort_by", AircraftRoute::Options::SortBy::PER_TRIP, "SortBy.PER_TRIP")
+            py::arg_v("sort_by", AircraftRoute::Options::SortBy::PER_TRIP, "SortBy.PER_TRIP"),
+            "inflate_distance_with_stopover"_a = false, "inflate_flight_time_with_ci"_a = false
         )
         .def_readwrite("tpd_mode", &AircraftRoute::Options::tpd_mode)
         .def_readwrite("trips_per_day_per_ac", &AircraftRoute::Options::trips_per_day_per_ac)
@@ -822,7 +912,9 @@ void pybind_init_route(py::module_& m) {
         .def_readwrite("max_flight_time", &AircraftRoute::Options::max_flight_time)
         .def_readwrite("min_flight_time", &AircraftRoute::Options::min_flight_time)
         .def_readwrite("config_algorithm", &AircraftRoute::Options::config_algorithm)
-        .def_readwrite("sort_by", &AircraftRoute::Options::sort_by);
+        .def_readwrite("sort_by", &AircraftRoute::Options::sort_by)
+        .def_readwrite("inflate_distance_with_stopover", &AircraftRoute::Options::inflate_distance_with_stopover)
+        .def_readwrite("inflate_flight_time_with_ci", &AircraftRoute::Options::inflate_flight_time_with_ci);
 
     py::class_<AircraftRoute::Stopover>(acr_class, "Stopover")
         .def_readonly("airport", &AircraftRoute::Stopover::airport)
@@ -831,6 +923,10 @@ void pybind_init_route(py::module_& m) {
         .def_static(
             "find_by_efficiency", &AircraftRoute::Stopover::find_by_efficiency, "origin"_a, "destination"_a,
             "aircraft"_a, "game_mode"_a
+        )
+        .def_static(
+            "find_by_target_distance_lt", &AircraftRoute::Stopover::find_by_target_distance_lt, "origin"_a,
+            "destination"_a, "aircraft"_a, "game_mode"_a, "target_distance"_a
         )
         .def("__repr__", &AircraftRoute::Stopover::repr)
         .def("to_dict", py::overload_cast<const AircraftRoute::Stopover&>(&to_dict));

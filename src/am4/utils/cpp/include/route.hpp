@@ -54,16 +54,20 @@ struct AircraftRoute {
         float min_flight_time;
         ConfigAlgorithm config_algorithm;
         SortBy sort_by;
+        bool inflate_distance_with_stopover;
+        bool inflate_flight_time_with_ci;
 
         Options(
             TPDMode tpd_mode = TPDMode::AUTO,
             uint16_t trips_per_day_per_ac = 1,
             double max_distance = MAX_DISTANCE,
             double min_distance = 0.0,
-            float max_flight_time = 24.0f,
+            float max_flight_time = -1.0f,
             float min_flight_time = 0.0f,
             ConfigAlgorithm config_algorithm = std::monostate(),
-            SortBy sort_by = SortBy::PER_TRIP
+            SortBy sort_by = SortBy::PER_TRIP,
+            bool inflate_distance_with_stopover = false,
+            bool inflate_flight_time_with_ci = false
         );
     };
     Route route;
@@ -92,6 +96,13 @@ struct AircraftRoute {
         Stopover(const Airport& airport, double full_distance);
         static Stopover find_by_efficiency(
             const Airport& origin, const Airport& destination, const Aircraft& aircraft, User::GameMode game_mode
+        );
+        static Stopover find_by_target_distance_lt(
+            const Airport& origin,
+            const Airport& destination,
+            const Aircraft& aircraft,
+            User::GameMode game_mode,
+            double target_distance
         );
         // static Stopover find_by_target_distance(const Airport& origin, const Airport& destination, const
         // Aircraft& aircraft, double target_distance, User::GameMode game_mode);
