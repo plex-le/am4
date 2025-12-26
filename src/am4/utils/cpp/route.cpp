@@ -499,7 +499,7 @@ inline float AircraftRoute::calc_contribution(double distance, const User& user,
 
     float contribution = std::min(multiplier * static_cast<float>(distance) * (3 - ci / 100.0f), 152.0f);
     if (user.game_mode == User::GameMode::REALISM) contribution *= 1.5f;
-    return contribution;
+    return contribution * 0.875f;
 }
 
 const string Route::repr(const Route& r) {

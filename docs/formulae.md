@@ -125,7 +125,18 @@ API: [utils.route.AircraftRoute.contribution][]
 
 ??? warning "SPOILERS: Click to reveal"
 
-    $$\$_\text{C} = \min\left(k_\text{gm}kd\left(3 - \frac{\text{CI}}{100}\right),152 \right) \pm 16\%$$
+    Let $C_{base} = \min\left(k_\text{gm}kd\left(3 - \frac{\text{CI}}{100}\right),152 \right) \pm 16\%$.
+
+    This base contribution can randomly "drop":
+
+    $$
+    C = \begin{cases}
+        C_{base} & \text{with probability } 0.75 \\
+        0.5 C_{base} & \text{with probability } 0.25
+    \end{cases}
+    $$
+
+    The expected contribution is thus $E[C] = 0.875 C_{base}$.
 
     where:
 
@@ -164,6 +175,11 @@ API: [utils.route.AircraftRoute.contribution][]
         $$
 
         Confidence: <span class="c-moderate">80%</span>
+    
+    !!! note
+        The 12.5% drop is observed sometime in 2025.
+
+        Updated: 15 Sep 2025 (data contributed by Burianto and other contributors)
 
 <!-- #### Optimal pure-contribution strategy
 
