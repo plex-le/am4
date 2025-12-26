@@ -239,6 +239,14 @@ AircraftRoute AircraftRoute::create(
         return acr;
     }
     const double full_distance = acr.stopover.exists ? acr.stopover.full_distance : acr.route.direct_distance;
+
+    if (full_distance > options.max_distance) {
+        acr.warnings.push_back(AircraftRoute::Warning::ERR_DISTANCE_ABOVE_SPECIFIED);
+        return acr;
+    } else if (full_distance < options.min_distance) {
+        acr.warnings.push_back(AircraftRoute::Warning::ERR_DISTANCE_BELOW_SPECIFIED);
+        return acr;
+    }
     acr.flight_time =
         static_cast<float>(full_distance) / (ac.speed * (user.game_mode == User::GameMode::EASY ? 1.5f : 1.0f));
     if (acr.flight_time > options.max_flight_time) {
