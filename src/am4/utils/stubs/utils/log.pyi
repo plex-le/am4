@@ -1,9 +1,11 @@
 from __future__ import annotations
+import collections.abc
 import datetime
-__all__ = ['AllianceLog', 'UserLog']
+import typing
+__all__: list[str] = ['AllianceLog', 'UserLog']
 class AllianceLog:
     class Member:
-        def __init__(self, id: int, username: str, joined: datetime.datetime, flights: int, contributed: int, daily_contribution: int, online: datetime.datetime, sv: float, season: int) -> None:
+        def __init__(self, id: typing.SupportsInt, username: str, joined: datetime.datetime, flights: typing.SupportsInt, contributed: typing.SupportsInt, daily_contribution: typing.SupportsInt, online: datetime.datetime, sv: typing.SupportsFloat, season: typing.SupportsInt) -> None:
             ...
         @property
         def contributed(self) -> int:
@@ -32,7 +34,7 @@ class AllianceLog:
         @property
         def username(self) -> str:
             ...
-    def __init__(self, id: int, name: str, rank: int, member_count: int, max_members: int, value: float, ipo: bool, min_sv: float, members: list[AllianceLog.Member]) -> None:
+    def __init__(self, id: typing.SupportsInt, name: str, rank: typing.SupportsInt, member_count: typing.SupportsInt, max_members: typing.SupportsInt, value: typing.SupportsFloat, ipo: bool, min_sv: typing.SupportsFloat, members: collections.abc.Sequence[AllianceLog.Member]) -> None:
         ...
     @property
     def id(self) -> int:
@@ -101,7 +103,7 @@ class UserLog:
         def stopover(self) -> str:
             ...
     class Share:
-        def __init__(self, ts: datetime.datetime, share: float) -> None:
+        def __init__(self, ts: datetime.datetime, share: typing.SupportsFloat) -> None:
             ...
         @property
         def share(self) -> float:
@@ -109,7 +111,7 @@ class UserLog:
         @property
         def ts(self) -> datetime.datetime:
             ...
-    def __init__(self, id: int, username: str, level: int, online: bool, share: float, shares_available: int, shares_sold: int, ipo: bool, fleet_count: int, routes: int, alliance: str, achievements: int, game_mode: bool, rank: int, reputation: int, cargo_reputation: int, founded: datetime.datetime, logo: str, share_log: list[UserLog.Share], awards: list[UserLog.Award], fleet: list[UserLog.AircraftCount], route_list: list[UserLog.RouteDetail]) -> None:
+    def __init__(self, id: typing.SupportsInt, username: str, level: typing.SupportsInt, online: bool, share: typing.SupportsFloat, shares_available: typing.SupportsInt, shares_sold: typing.SupportsInt, ipo: bool, fleet_count: typing.SupportsInt, routes: typing.SupportsInt, alliance: str, achievements: typing.SupportsInt, game_mode: bool, rank: typing.SupportsInt, reputation: typing.SupportsInt, cargo_reputation: typing.SupportsInt, founded: datetime.datetime, logo: str, share_log: collections.abc.Sequence[UserLog.Share], awards: collections.abc.Sequence[UserLog.Award], fleet: collections.abc.Sequence[UserLog.AircraftCount], route_list: collections.abc.Sequence[UserLog.RouteDetail]) -> None:
         ...
     @property
     def achievements(self) -> int:

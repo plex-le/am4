@@ -1,9 +1,10 @@
 from __future__ import annotations
 import am4.utils.game
-__all__ = ['CargoTicket', 'PaxTicket', 'VIPTicket']
+import typing
+__all__: list[str] = ['CargoTicket', 'PaxTicket', 'VIPTicket']
 class CargoTicket:
     @staticmethod
-    def from_optimal(distance: float, game_mode: am4.utils.game.User.GameMode = am4.utils.game.User.GameMode.EASY) -> PaxTicket:
+    def from_optimal(distance: typing.SupportsFloat, game_mode: am4.utils.game.User.GameMode = am4.utils.game.User.GameMode.EASY) -> PaxTicket:
         ...
     def __repr__(self) -> str:
         ...
@@ -17,7 +18,7 @@ class CargoTicket:
         ...
 class PaxTicket:
     @staticmethod
-    def from_optimal(distance: float, game_mode: am4.utils.game.User.GameMode = am4.utils.game.User.GameMode.EASY) -> PaxTicket:
+    def from_optimal(distance: typing.SupportsFloat, game_mode: am4.utils.game.User.GameMode = am4.utils.game.User.GameMode.EASY) -> PaxTicket:
         ...
     def __repr__(self) -> str:
         ...
@@ -34,7 +35,7 @@ class PaxTicket:
         ...
 class VIPTicket:
     @staticmethod
-    def from_optimal(distance: float, game_mode: am4.utils.game.User.GameMode = am4.utils.game.User.GameMode.EASY) -> VIPTicket:
+    def from_optimal(distance: typing.SupportsFloat, game_mode: am4.utils.game.User.GameMode = am4.utils.game.User.GameMode.EASY) -> VIPTicket:
         ...
     def __repr__(self) -> str:
         ...

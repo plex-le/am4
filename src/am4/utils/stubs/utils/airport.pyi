@@ -1,6 +1,6 @@
 from __future__ import annotations
 import typing
-__all__ = ['Airport']
+__all__: list[str] = ['Airport']
 class Airport:
     class ParseResult:
         def __init__(self, arg0: Airport.SearchType, arg1: str) -> None:
@@ -51,7 +51,7 @@ class Airport:
             ...
         def __index__(self) -> int:
             ...
-        def __init__(self, value: int) -> None:
+        def __init__(self, value: typing.SupportsInt) -> None:
             ...
         def __int__(self) -> int:
             ...
@@ -59,7 +59,7 @@ class Airport:
             ...
         def __repr__(self) -> str:
             ...
-        def __setstate__(self, state: int) -> None:
+        def __setstate__(self, state: typing.SupportsInt) -> None:
             ...
         def __str__(self) -> str:
             ...
@@ -70,7 +70,7 @@ class Airport:
         def value(self) -> int:
             ...
     class Suggestion:
-        def __init__(self, arg0: Airport, arg1: float) -> None:
+        def __init__(self, arg0: Airport, arg1: typing.SupportsFloat) -> None:
             ...
         @property
         def ap(self) -> Airport:

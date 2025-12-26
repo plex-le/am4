@@ -8,7 +8,7 @@
 
 using std::get;
 
-Route::Route() : direct_distance(0.0), valid(false){};
+Route::Route() : direct_distance(0.0), valid(false) {};
 
 // basic route meta
 Route Route::create(const Airport& ap1, const Airport& ap2) {
@@ -181,7 +181,7 @@ inline void AircraftRoute::update_cargo_details(
     this->ticket = tkt;
 }
 
-AircraftRoute::AircraftRoute() : valid(false){};
+AircraftRoute::AircraftRoute() : valid(false) {};
 AircraftRoute::Options::Options(
     TPDMode tpd_mode,
     uint16_t trips_per_day_per_ac,
@@ -384,8 +384,8 @@ inline double AircraftRoute::calc_co2(
     double ac_load = ac.type == Aircraft::Type::CARGO ? user.cargo_load : user.load;
     return (
         (1 - user.co2_training / 100.0) *
-        (ceil(distance * 100.0) / 100.0 * ac.co2 * ((cfg.y + cfg.j * 2 + cfg.f * 3) * ac_load) + (cfg.y + cfg.j + cfg.f)
-        ) *
+        (ceil(distance * 100.0) / 100.0 * ac.co2 * ((cfg.y + cfg.j * 2 + cfg.f * 3) * ac_load) +
+         (cfg.y + cfg.j + cfg.f)) *
         (ci / 2000.0 + 0.9)
     );
 }
@@ -517,6 +517,62 @@ std::vector<Destination> RoutesSearch::get() const {
                                 b.ac_route.profit * b.ac_route.trips_per_day_per_ac;
                      };
     std::sort(destinations.begin(), destinations.end(), cmp);
+    return destinations;
+}
+
+// ferry flight has different mechanics: no pax/cargo, hence no co2, demand, configuration needed.
+// it can also fly to *any* airport, even if out of range.
+std::vector<Destination> RoutesSearch::get_sell() const {
+    std::vector<Destination> destinations;
+    const auto& db = Database::Client();
+
+    const uint16_t rwy_requirement = this->user.game_mode == User::GameMode::EASY ? 0 : this->aircraft.rwy;
+
+    for (const Airport& origin : this->origins) {
+        for (const Airport& ap : db->airports) {
+            if (ap.rwy < rwy_requirement || ap.id == origin.id) continue;
+
+            double dist = Route::calc_distance(origin, ap);
+
+            if (dist > this->options.max_distance || dist < this->options.min_distance) continue;
+            if (dist > this->aircraft.range * 2) continue;
+
+            float flight_time = static_cast<float>(dist / this->aircraft.speed);
+            if (this->user.game_mode == User::GameMode::EASY) flight_time *= 1.5f;
+
+            if (flight_time > this->options.max_flight_time || flight_time < this->options.min_flight_time) continue;
+
+            AircraftRoute ar;
+            ar.route.direct_distance = dist;
+            ar.route.valid = true;
+            ar.valid = true;
+            ar.flight_time = flight_time;
+            ar.num_ac = 1;
+            ar.trips_per_day_per_ac = 1;
+            ar._ac_type = this->aircraft.type;
+
+            ar.fuel = AircraftRoute::calc_fuel(this->aircraft, dist, this->user, 200);
+            ar.co2 = 0;
+
+            double market_pct = ap.market / 100.0;
+            double sell_value = this->aircraft.cost * market_pct;
+
+            ar.income = sell_value;
+            ar.profit = sell_value - ar.fuel - ar.co2;
+
+            ar.max_income = ar.income;
+            ar.contribution = 0;
+            ar.acheck_cost = 0;
+            ar.repair_cost = 0;
+
+            destinations.emplace_back(origin, ap, ar);
+        }
+    }
+
+    std::sort(destinations.begin(), destinations.end(), [](const Destination& a, const Destination& b) {
+        return a.ac_route.profit > b.ac_route.profit;
+    });
+
     return destinations;
 }
 
@@ -689,6 +745,36 @@ std::map<string, py::list> _get_columns(const RoutesSearch& rs, const vector<Des
     return cols;
 }
 
+std::map<string, py::list> _get_sell_columns(
+    const RoutesSearch& rs, const vector<Destination>& dests, bool include_origin
+) {
+    std::map<string, py::list> cols;
+    for (const Destination& dest : dests) {
+        if (include_origin) {
+            cols["00|orig.id"].append(dest.origin.id);
+            cols["03|orig.iata"].append(dest.origin.iata);
+            cols["04|orig.icao"].append(dest.origin.icao);
+        }
+        cols["10|dest.id"].append(dest.airport.id);
+        cols["11|dest.name"].append(dest.airport.name);
+        cols["12|dest.country"].append(dest.airport.country);
+        cols["13|dest.iata"].append(dest.airport.iata);
+        cols["14|dest.icao"].append(dest.airport.icao);
+        cols["14.1|dest.market"].append(dest.airport.market);
+
+        cols["98|dest.lat"].append(dest.airport.lat);
+        cols["99|dest.lng"].append(dest.airport.lng);
+
+        auto& acr = dest.ac_route;
+        cols["30|direct_dist"].append(acr.route.direct_distance);
+        cols["31|time"].append(acr.flight_time);
+        cols["34|income"].append(acr.income);
+        cols["35|fuel"].append(acr.fuel);
+        cols["39|profit"].append(acr.profit);
+    }
+    return cols;
+}
+
 void pybind_init_route(py::module_& m) {
     py::module_ m_route = m.def_submodule("route");
 
@@ -828,10 +914,16 @@ void pybind_init_route(py::module_& m) {
             py::arg_v("user", User::Default(), "am4.utils.game.User.Default()")
         )
         .def("get", &RoutesSearch::get, py::call_guard<py::gil_scoped_release>())
+        .def("get_sell", &RoutesSearch::get_sell, py::call_guard<py::gil_scoped_release>())
         .def(
             "_get_columns",
             py::overload_cast<const RoutesSearch&, const vector<Destination>&, const bool>(&_get_columns), "dests"_a,
             "include_origin"_a = false
+        )
+        .def(
+            "_get_sell_columns",
+            py::overload_cast<const RoutesSearch&, const vector<Destination>&, const bool>(&_get_sell_columns),
+            "dests"_a, "include_origin"_a = false
         );
 }
 #endif

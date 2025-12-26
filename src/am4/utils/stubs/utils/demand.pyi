@@ -1,12 +1,12 @@
 from __future__ import annotations
 import typing
-__all__ = ['CargoDemand', 'PaxDemand']
+__all__: list[str] = ['CargoDemand', 'PaxDemand']
 class CargoDemand:
     @typing.overload
     def __init__(self) -> None:
         ...
     @typing.overload
-    def __init__(self, l: int, h: int) -> None:
+    def __init__(self, l: typing.SupportsInt, h: typing.SupportsInt) -> None:
         ...
     @typing.overload
     def __init__(self, pax_demand: PaxDemand) -> None:
@@ -26,7 +26,7 @@ class PaxDemand:
     def __init__(self) -> None:
         ...
     @typing.overload
-    def __init__(self, y: int, j: int, f: int) -> None:
+    def __init__(self, y: typing.SupportsInt, j: typing.SupportsInt, f: typing.SupportsInt) -> None:
         ...
     def __repr__(self) -> str:
         ...

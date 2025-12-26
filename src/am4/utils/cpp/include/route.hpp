@@ -183,4 +183,5 @@ class RoutesSearch {
     }
 
     vector<Destination> get() const;
+    vector<Destination> get_sell() const;
 };

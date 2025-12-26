@@ -49,14 +49,6 @@ HELP_AC = (
 )
 HELP_CONSTRAINT = (
     "**Constraint**\n"
-    "- when not specified or given `NONE`, it'll optimise for max. profit per day per A/C\n"
-    "- if a constraint is given, it'll optimise for max. profit per trip\n"
-    "  - by default, it'll be interpreted as distance in kilometres (i.e. `16000` will return routes < 16,000km)\n"
-    "  - to constrain by flight time instead, use the `HH:MM`, `1d, HH:MM` or "
-    ""
-)
-HELP_CONSTRAINT = (
-    "**Constraint**\n"
     "Defines the search range for distance (km) or flight time (HH:MM, see "
     "[ISO 8601](https://en.wikipedia.org/wiki/ISO_8601#Durations) syntax).\n"
     "- `16000`: max distance of 16,000 km\n"
@@ -91,6 +83,24 @@ def add_data(is_multi_hub: bool, o: Airport, d: Destination, is_cargo: bool, emb
     )
 
 
+def add_sell_data(is_multi_hub: bool, o: Airport, d: Destination, _is_cargo: bool, embed: discord.Embed):
+    acr = d.ac_route
+    origin_f = f"{format_ap_short(o, mode=0)}\n" if is_multi_hub else ""
+    distance_f = f"{acr.route.direct_distance:.0f} km"
+    flight_time_f = format_flight_time(acr.flight_time)
+
+    embed.add_field(
+        name=f"{origin_f}{format_ap_short(d.airport, mode=2)}",
+        value=(
+            f"**Market**: {d.airport.market}%\n"
+            f"**Details**: {distance_f} ({flight_time_f})\n"
+            f"** Profit**: $ {acr.profit:,.0f}\n"
+            f"**   Fuel**: $ {acr.fuel:,.0f}\n"
+        ),
+        inline=False,
+    )
+
+
 class ButtonHandler(discord.ui.View):
     def __init__(
         self,
@@ -103,11 +113,13 @@ class ButtonHandler(discord.ui.View):
         user: User,
         mpl_map: MPLMap,
         mpl_map_executor: ProcessPoolExecutor,
+        callback=add_data,
     ):
         super().__init__(timeout=15)
         self.message = message
         self.root_message = message
         self.start = 3
+        self.callback = callback
 
         if len(destinations) <= 3:
             self.handle_show_more.disabled = True
@@ -136,7 +148,7 @@ class ButtonHandler(discord.ui.View):
             colour=get_user_colour(self.user),
         )
         for d in self.destinations[self.start : end]:
-            add_data(self.is_multi_hub, d.origin, d, self.is_cargo, emb)
+            self.callback(self.is_multi_hub, d.origin, d, self.is_cargo, emb)
         emb.set_footer(text=f"Showing {self.start}-{end} of {len(self.destinations)} routes")
 
         v = {"view": self} if self.start + 3 <= len(self.destinations) else {}
@@ -378,7 +390,7 @@ class RoutesCog(BaseCog):
             if max_distance is not None
             else max_flight_time
         )
-        cons_eq_f = (f"{max_distance}, equivalent to " if max_distance else "") + f"max `{cons_eq_t:.2f}` hr"
+        cons_eq_f = (f"`{max_distance}`km, equivalent to " if max_distance else "") + f"max `{cons_eq_t:.2f}` hr"
         sugg_cons_t, sugg_tpd = 24 / tpd, math.floor(24 / cons_eq_t)
         if (t_ttl := cons_eq_t * tpd) > 24 and tpd_set:
             embed = discord.Embed(
@@ -448,6 +460,114 @@ class RoutesCog(BaseCog):
         await h.invalid_aircraft()
         await h.invalid_tpd()
         await h.invalid_cfg_alg()
+        await h.invalid_constraint()
+
+        await h.banned_user()
+        await h.too_many_args("argument")
+        await h.common_mistakes()
+        await h.raise_for_unhandled()
+
+    @commands.command(
+        brief="Finds best airport to sell aircraft",
+        help=(
+            "Finds the best airport to sell an aircraft based on market percentage.\n"
+            "Considers ferry flight costs (fuel).\n"
+            f"Usage: `{cfg.bot.COMMAND_PREFIX}sell hkg a388`\n"
+        ),
+    )
+    async def sell(
+        self,
+        ctx: commands.Context,
+        ap_queries: list[Airport.SearchResult] = commands.parameter(converter=MultiAirportCvtr, description=HELP_AP),
+        ac_query: Aircraft.SearchResult = commands.parameter(converter=AircraftCvtr, description=HELP_AC),
+        constraint: Constraint = commands.parameter(
+            converter=ConstraintCvtr,
+            default=ConstraintCvtr._default,
+            displayed_default="NONE",
+            description=HELP_CONSTRAINT,
+        ),
+    ):
+        options = AircraftRoute.Options(
+            **{
+                k: v
+                for k, v in {
+                    "max_distance": constraint.max_distance,
+                    "min_distance": constraint.min_distance,
+                    "max_flight_time": constraint.max_flight_time,
+                    "min_flight_time": constraint.min_flight_time,
+                    "sort_by": AircraftRoute.Options.SortBy.PER_TRIP,
+                }.items()
+                if v is not None
+            }
+        )
+
+        u, _ue = await fetch_user_info(ctx)
+
+        if (
+            u.game_mode == u.GameMode.REALISM
+            and (warning := get_realism_departure_runway_warning(ac_query.ac, [ap.ap for ap in ap_queries])) is not None
+        ):
+            await ctx.send(embed=warning)
+
+        rs = RoutesSearch([ap.ap for ap in ap_queries], ac_query.ac, options, u)
+
+        loop = asyncio.get_event_loop()
+        t_start = time.time()
+        destinations = await loop.run_in_executor(self.executor, rs.get_sell)
+        t_end = time.time()
+
+        if is_multi_hub := (len(ap_queries) > 1):
+            title = f"Sell {ac_query.ac.shortname} from {len(ap_queries)} hubs"
+        else:
+            ap = ap_queries[0].ap
+            title = f"Sell {ac_query.ac.shortname} from `{ap.iata}` {ap.name}, {ap.country}"
+
+        embed = discord.Embed(
+            title=title,
+            colour=get_user_colour(u),
+        )
+
+        if destinations:
+            for i, d in enumerate(destinations):
+                if i > 2:
+                    break
+                add_sell_data(is_multi_hub, d.origin, d, False, embed)
+        else:
+            embed.description = "No suitable airports found."
+
+        embed.set_footer(
+            text=(f"{len(destinations)} airports found in {(t_end - t_start) * 1000:.2f} ms\n"),
+        )
+        msg = await ctx.send(embed=embed)
+
+        if not destinations:
+            return
+
+        cols = rs._get_sell_columns(destinations, include_origin=is_multi_hub)
+        iatas = "-".join([ap.ap.iata for ap in ap_queries])
+        file_suffix = f"sell_{iatas}_{ac_query.ac.shortname}"
+
+        btns = ButtonHandler(
+            msg,
+            is_multi_hub,
+            destinations,
+            cols,
+            False,
+            file_suffix,
+            u,
+            self.mpl_map,
+            self.mpl_map_executor,
+            callback=add_sell_data,
+        )
+        btns.remove_item(btns.handle_compare_hubs)
+        await msg.edit(view=btns)
+
+    @sell.error
+    async def sell_error(self, ctx: commands.Context, error: commands.CommandError):
+        h = CustomErrHandler(ctx, error, "sell")
+        await h.invalid_airport()
+        await h.too_many_airports()
+        await h.invalid_aircraft()
         await h.invalid_constraint()
 
         await h.banned_user()
