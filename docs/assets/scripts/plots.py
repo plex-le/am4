@@ -30,5 +30,8 @@ class MPL:
                 "text.color": "#888",
                 "xtick.color": "#888",
                 "ytick.color": "#888",
+                "axes3d.xaxis.panecolor": (0.9, 0.9, 0.9, 0.1),
+                "axes3d.yaxis.panecolor": (0.9, 0.9, 0.9, 0.1),
+                "axes3d.zaxis.panecolor": (0.9, 0.9, 0.9, 0.1),
             }
         )
