@@ -10,12 +10,11 @@ from dataclasses import dataclass
 import discord
 import orjson
 import polars as pl
-from discord.ext import commands
-
 from am4.utils.aircraft import Aircraft
 from am4.utils.airport import Airport
 from am4.utils.game import User
 from am4.utils.route import AircraftRoute, Destination, RoutesSearch
+from discord.ext import commands
 
 from ...config import cfg
 from ..base import BaseCog
@@ -72,7 +71,7 @@ def add_data(is_multi_hub: bool, o: Airport, d: Destination, is_cargo: bool, emb
         added_dist = acr.stopover.full_distance - acr.route.direct_distance
         added_pct = added_dist / acr.route.direct_distance * 100
         distance_f = f"{acr.stopover.full_distance:.0f} km"
-        detour_str = f", +{added_pct:.1f}%" if added_pct >= 0.001 else ""
+        detour_str = f", +{added_pct:.1f}%" if added_pct >= 0.002 else ""
     else:
         distance_f, detour_str = f"{acr.route.direct_distance:.0f} km", ""
     flight_time_f = format_flight_time(acr.flight_time)

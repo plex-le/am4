@@ -125,18 +125,9 @@ API: [utils.route.AircraftRoute.contribution][]
 
 ??? warning "SPOILERS: Click to reveal"
 
-    Let $C_{base} = \min\left(k_\text{gm}kd\left(3 - \frac{\text{CI}}{100}\right),152 \right) \pm 16\%$.
-
-    This base contribution can randomly "drop":
-
     $$
-    C = \begin{cases}
-        C_{base} & \text{with probability } 0.75 \\
-        0.5 C_{base} & \text{with probability } 0.25
-    \end{cases}
+    \$_\text{C} = k_\text{drop} \min\left(k_\text{gm}kd\left(3 - \frac{\text{CI}}{100}\right),152 \right) \pm 16\%
     $$
-
-    The expected contribution is thus $E[C] = 0.875 C_{base}$.
 
     where:
 
@@ -161,6 +152,14 @@ API: [utils.route.AircraftRoute.contribution][]
         $$
 
     - $\text{CI}$: between 0 and 200
+    - $k_\text{drop}$ is a factor accounting for random drops in contribution, with an expected value of $\mathbb{E}[k_\text{drop}] = 0.875$:
+
+        $$
+        k_\text{drop} = \begin{cases}
+            1 & p = 0.75 \\
+            0.5 & p = 0.25
+        \end{cases}
+        $$
 
     Contribution is reduced when the flight distance is less than 1000km. ([REDUCED_CONTRIBUTION warning][utils.route.AircraftRoute.Warning.REDUCED_CONTRIBUTION]
     in [utils.route.AircraftRoute.warnings][])
@@ -177,9 +176,9 @@ API: [utils.route.AircraftRoute.contribution][]
         Confidence: <span class="c-moderate">80%</span>
     
     !!! note
-        The 12.5% drop is observed sometime in 2025.
+        The 12.5% drop ($k_\text{drop}$) is observed sometime in 2025.
 
-        Updated: 15 Sep 2025 (data contributed by Burianto and other contributors)
+        Updated: 15 Sep 2025 (data contributed by NeVia and other contributors from Alliance *Ariving GER*)
 
 <!-- #### Optimal pure-contribution strategy
 
@@ -526,7 +525,7 @@ where:
 
 ### Creation cost
 
-Found: 2024 (Alliance *Ariving Germany*)
+Found: 2024 (Alliance *Ariving GER*)
 
 Confidence: <span class="c-good">100%</span>
 
@@ -786,17 +785,19 @@ ___
 
 **Note**: Prior to May 2025, the XP awarded is fixed for every single departure, regardless of the route distance. This mechanic was superseded by a more complex formula intended to counter against TP farming.
 
-Found: July 11 2025 (Cathay Express, data contributed by Burianto)
+Found: July 11 2025 (Cathay Express, data contributed by NeVia)
 
-Confidence: <span class="c-good">90%</span>
+Updated: December 28 2025
+
+Confidence: <span class="c-good">95%</span>
 
 $$
 \begin{align*}
-\text{load factor} &= \frac{\begin{cases}
+\text{LF} &= \frac{\begin{cases}
 y_l + 2 j_l + 3 f_l &\text{if pax} \\
 \frac{1}{0.7}l_l + h_l &\text{if cargo}
 \end{cases}}{\text{capacity}} \\
-\mathrm{xp} &= \frac{\mathrm{round}(a + \text{load factor} + b d + c, 5)}{2l + 1}
+\mathrm{xp} &= \frac{\mathrm{round}(a + \text{LF} + b d \text{LF}, 5)}{2l + 1}
 \end{align*}
 $$
 
@@ -806,14 +807,15 @@ where:
 - $l_l$, $h_l$: actual load of large and heavy cargo (lbs)
 - $d$: total distance[^1] of the flight.
 - $l$: current level number
-- $a$, $b$, $c$: coefficients
+- $a$, $b$: coefficients
 
-|            | $a$   | $b$    | $c$ |
-| ---------- | ----- | ------ | --- |
-| global7500 | 59.5  | 0.0114 | -46 |
-| mc214      | 52.5  | 0.0089 | -38 |
-| a388       | 120.8 | 0.0123 | -82 |
-| b748       | 122.7 | 0.0110 | -80 |
+| Aircraft Type | $a$        | $b$          | RMSE  |
+| :------------ | :--------- | :----------- | :---- |
+| mc214         | 7.58± 7.7% | 0.0107± 0.9% | 1.738 |
+| b773ersf      | 33.3± 3.6% | 0.0193± 0.5% | 1.56  |
+| b748          | 25.2± 2.9% | 0.0132± 0.8% | 3.599 |
+| b748f         | 35.6± 1.5% | 0.019± 0.3%  | 1.642 |
+| a388          | 26.5± 0.7% | 0.0141± 0.2% | 2.672 |
 
 !!! note
     these values are approximate (fitted from data) and will expand as more data comes in.
