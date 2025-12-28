@@ -1,13 +1,13 @@
-use crate::route::demand::CargoDemand;
-use crate::route::demand::PaxDemand;
+use crate::route::demand::{CargoDemand, PaxDemand};
+use crate::user::{HeavyTraining, LargeTraining};
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CargoConfig {
     pub l: u8,
     pub h: u8,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
 pub enum CargoConfigAlgorithm {
     #[default]
     Auto,
@@ -17,14 +17,14 @@ pub enum CargoConfigAlgorithm {
 
 impl CargoConfig {
     fn calc_l_conf(
-        d_pf: &PaxDemand,
+        d_pf: PaxDemand,
         capacity: u32,
-        l_training: u8,
-        h_training: u8,
+        l_training: LargeTraining,
+        h_training: HeavyTraining,
     ) -> Option<Self> {
-        let d_pf_cargo = CargoDemand::from(d_pf);
+        let d_pf_cargo = CargoDemand::from(&d_pf);
 
-        let l_cap = capacity as f32 * 0.7 * (1.0 + l_training as f32 / 100.0);
+        let l_cap = capacity as f32 * 0.7 * (1.0 + l_training.get() as f32 / 100.0);
 
         if d_pf_cargo.l as f32 > l_cap {
             return Some(CargoConfig { l: 100, h: 0 });
@@ -32,7 +32,7 @@ impl CargoConfig {
 
         let l = d_pf_cargo.l as f32 / l_cap;
         let h = 1. - l;
-        if (d_pf_cargo.h as f32) < capacity as f32 * h * (1.0 + h_training as f32 / 100.0) {
+        if (d_pf_cargo.h as f32) < capacity as f32 * h * (1.0 + h_training.get() as f32 / 100.0) {
             None
         } else {
             let lu = (l * 100.0) as u8;
@@ -42,14 +42,14 @@ impl CargoConfig {
     }
 
     fn calc_h_conf(
-        d_pf: &PaxDemand,
+        d_pf: PaxDemand,
         capacity: u32,
-        l_training: u8,
-        h_training: u8,
+        l_training: LargeTraining,
+        h_training: HeavyTraining,
     ) -> Option<Self> {
-        let d_pf_cargo = CargoDemand::from(d_pf);
+        let d_pf_cargo = CargoDemand::from(&d_pf);
 
-        let h_cap = capacity as f32 * (1.0 + h_training as f32 / 100.0);
+        let h_cap = capacity as f32 * (1.0 + h_training.get() as f32 / 100.0);
 
         if d_pf_cargo.h as f32 > h_cap {
             return Some(CargoConfig { l: 0, h: 100 });
@@ -57,7 +57,9 @@ impl CargoConfig {
 
         let h = d_pf_cargo.h as f32 / h_cap;
         let l = 1. - h;
-        if (d_pf_cargo.l as f32) < capacity as f32 * l * 0.7 * (1.0 + l_training as f32 / 100.0) {
+        if (d_pf_cargo.l as f32)
+            < capacity as f32 * l * 0.7 * (1.0 + l_training.get() as f32 / 100.0)
+        {
             None
         } else {
             let hu = (h * 100.0) as u8;
@@ -67,11 +69,11 @@ impl CargoConfig {
     }
 
     // Implements a greedy configuration algorithm for cargo aircraft.
-    pub fn calculate_cargo_config(
-        d_pf: &PaxDemand,
+    pub fn calculate(
+        d_pf: PaxDemand,
         capacity: u32,
-        l_training: u8,
-        h_training: u8,
+        l_training: LargeTraining,
+        h_training: HeavyTraining,
         algorithm: CargoConfigAlgorithm,
     ) -> Option<Self> {
         match algorithm {

@@ -51,7 +51,7 @@ impl Distance {
         Self(Self::RADIUS_EARTH * c)
     }
 
-    pub fn get(&self) -> f32 {
+    pub const fn get(&self) -> f32 {
         self.0
     }
 }

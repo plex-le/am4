@@ -3,6 +3,7 @@ use std::ops::{Div, Mul};
 pub mod config;
 pub mod db;
 pub mod demand;
+pub mod metrics;
 pub mod search;
 pub mod ticket;
 

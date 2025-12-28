@@ -9,7 +9,7 @@ impl Speed {
         Self(value)
     }
 
-    pub fn get(&self) -> f32 {
+    pub const fn get(&self) -> f32 {
         self.0
     }
 }

@@ -5,7 +5,7 @@ use rkyv::{Archive as Ra, Deserialize as Rd, Serialize as Rs};
 #[cfg(feature = "serde")]
 use serde::Deserialize;
 
-#[derive(Debug, Clone, PartialEq, Display)]
+#[derive(Debug, Clone, Copy, PartialEq, Display)]
 #[display("Y{y} J{j} F{f}")]
 #[cfg_attr(feature = "serde", derive(Deserialize))]
 #[cfg_attr(feature = "rkyv", derive(Ra, Rd, Rs), archive(check_bytes))]

@@ -3,7 +3,7 @@ use crate::user::GameMode;
 use derive_more::Display;
 use std::cmp::min;
 
-#[derive(Debug, Clone, PartialEq, Display)]
+#[derive(Debug, Clone, Copy, PartialEq, Display)]
 #[display("Y{y} J{j} F{f}")]
 pub struct PaxConfig {
     pub y: u16,
@@ -11,7 +11,7 @@ pub struct PaxConfig {
     pub f: u16,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
 pub enum PaxConfigAlgorithm {
     #[default]
     Auto,
@@ -26,19 +26,19 @@ pub enum PaxConfigAlgorithm {
 impl PaxConfig {
     /// Implements a greedy configuration algorithm for pax aircraft.
     /// Returns None if demand is exhausted.
-    pub fn calculate_pax_config(
-        d_pf: &PaxDemand,
+    pub fn calculate(
+        d_pf: PaxDemand,
         capacity: u16,
         distance: f32,
-        game_mode: &GameMode,
-        algorithm: &PaxConfigAlgorithm,
+        game_mode: GameMode,
+        algorithm: PaxConfigAlgorithm,
     ) -> Option<PaxConfig> {
         match algorithm {
             PaxConfigAlgorithm::Auto => match game_mode {
                 GameMode::Easy => {
                     if distance < 14425. {
                         Self::from_fjy(d_pf, capacity)
-                    } else if distance < 14812. {
+                    } else if distance < 14812.5 {
                         Self::from_fyj(d_pf, capacity)
                     } else if distance < 15200. {
                         Self::from_yfj(d_pf, capacity)
@@ -67,7 +67,7 @@ impl PaxConfig {
         }
     }
 
-    fn from_fjy(d_pf: &PaxDemand, capacity: u16) -> Option<Self> {
+    fn from_fjy(d_pf: PaxDemand, capacity: u16) -> Option<Self> {
         let mut remaining_capacity = capacity;
 
         let f = min(d_pf.f, remaining_capacity / 3);
@@ -85,7 +85,7 @@ impl PaxConfig {
         }
     }
 
-    fn from_fyj(d_pf: &PaxDemand, capacity: u16) -> Option<Self> {
+    fn from_fyj(d_pf: PaxDemand, capacity: u16) -> Option<Self> {
         let mut remaining_capacity = capacity;
 
         let f = min(d_pf.f, remaining_capacity / 3);
@@ -103,7 +103,7 @@ impl PaxConfig {
         }
     }
 
-    fn from_jfy(d_pf: &PaxDemand, capacity: u16) -> Option<Self> {
+    fn from_jfy(d_pf: PaxDemand, capacity: u16) -> Option<Self> {
         let mut remaining_capacity = capacity;
 
         let j = min(d_pf.j, remaining_capacity / 2);
@@ -121,7 +121,7 @@ impl PaxConfig {
         }
     }
 
-    fn from_jyf(d_pf: &PaxDemand, capacity: u16) -> Option<Self> {
+    fn from_jyf(d_pf: PaxDemand, capacity: u16) -> Option<Self> {
         let mut remaining_capacity = capacity;
 
         let j = min(d_pf.j, remaining_capacity / 2);
@@ -139,7 +139,7 @@ impl PaxConfig {
         }
     }
 
-    fn from_yfj(d_pf: &PaxDemand, capacity: u16) -> Option<Self> {
+    fn from_yfj(d_pf: PaxDemand, capacity: u16) -> Option<Self> {
         let mut remaining_capacity = capacity;
 
         let y = min(d_pf.y, remaining_capacity);
@@ -157,7 +157,7 @@ impl PaxConfig {
         }
     }
 
-    fn from_yjf(d_pf: &PaxDemand, capacity: u16) -> Option<Self> {
+    fn from_yjf(d_pf: PaxDemand, capacity: u16) -> Option<Self> {
         let mut remaining_capacity = capacity;
 
         let y = min(d_pf.y, remaining_capacity);

@@ -1,6 +1,6 @@
 use std::sync::LazyLock;
 
-use derive_more::derive::{Constructor, Display, From, Into};
+use derive_more::{Constructor, Display, From, Into};
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -45,7 +45,8 @@ pub struct Settings {
     pub co2_price: Co2Price,
     pub accumulated_count: u16,
     pub load: AircraftLoad,
-    pub income_loss_tol: f32,
+    pub cargo_load: AircraftLoad,
+    pub income_loss_tol: IncomeLossTol,
     pub fourx: bool,
 }
 
@@ -63,23 +64,58 @@ impl Default for &Settings {
 #[derive(Debug, Clone, Copy, PartialEq, From, Into, Constructor)]
 pub struct FuelPrice(u16);
 
+impl FuelPrice {
+    pub const fn get(&self) -> f32 {
+        self.0 as f32
+    }
+}
+
 /// The assumed CO₂, for use in profit calculations
 #[derive(Debug, Clone, Copy, PartialEq, From, Into, Constructor)]
 pub struct Co2Price(u16);
 
-#[derive(Debug, Clone, PartialEq, Default)]
+impl Co2Price {
+    pub const fn get(&self) -> f32 {
+        self.0 as f32
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub enum GameMode {
     #[default]
     Easy,
     Realism,
 }
 
+impl GameMode {
+    pub const fn speed_multiplier(&self) -> f32 {
+        match self {
+            Self::Easy => 1.5,
+            Self::Realism => 1.0,
+        }
+    }
+
+    pub const fn cost_multiplier(&self) -> f32 {
+        match self {
+            Self::Easy => 0.5,
+            Self::Realism => 1.0,
+        }
+    }
+
+    pub const fn contribution_multiplier(&self) -> f32 {
+        match self {
+            Self::Easy => 1.0,
+            Self::Realism => 1.5,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct Training {
     pub wear: WearTraining,
     pub repair: RepairTraining,
-    pub large: LargeTraining,
-    pub heavy: HeavyTraining,
+    pub l: LargeTraining,
+    pub h: HeavyTraining,
     pub fuel: FuelTraining,
     pub co2: Co2Training,
 }
@@ -130,6 +166,12 @@ macro_rules! create_validated_newtype {
         create_newtype!($name, $inner_type);
         impl_constructor!($name, $inner_type, $condition, $err_variant);
         impl_default!($name, $default_value);
+
+        impl $name {
+            pub const fn get(&self) -> $inner_type {
+                self.0
+            }
+        }
     };
 }
 
@@ -149,12 +191,12 @@ create_validated_newtype!(
     InvalidIncomeLossTol,
     0.0
 );
-create_validated_newtype!(WearTraining, u8, |v| v < 5, InvalidWearTraining, 0);
-create_validated_newtype!(RepairTraining, u8, |v| v < 5, InvalidRepairTraining, 0);
-create_validated_newtype!(LargeTraining, u8, |v| v < 6, InvalidLargeTraining, 0);
-create_validated_newtype!(HeavyTraining, u8, |v| v < 6, InvalidHeavyTraining, 0);
-create_validated_newtype!(FuelTraining, u8, |v| v < 3, InvalidFuelTraining, 0);
-create_validated_newtype!(Co2Training, u8, |v| v < 5, InvalidCo2Training, 0);
+create_validated_newtype!(WearTraining, u8, |v| v <= 5, InvalidWearTraining, 0);
+create_validated_newtype!(RepairTraining, u8, |v| v <= 5, InvalidRepairTraining, 0);
+create_validated_newtype!(LargeTraining, u8, |v| v <= 6, InvalidLargeTraining, 0);
+create_validated_newtype!(HeavyTraining, u8, |v| v <= 6, InvalidHeavyTraining, 0);
+create_validated_newtype!(FuelTraining, u8, |v| v <= 3, InvalidFuelTraining, 0);
+create_validated_newtype!(Co2Training, u8, |v| v <= 5, InvalidCo2Training, 0);
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub enum Role {
