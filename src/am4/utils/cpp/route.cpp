@@ -625,7 +625,7 @@ std::vector<Destination> RoutesSearch::get_sell() const {
             if (dist > this->aircraft.range * 2) continue;
 
             float flight_time = static_cast<float>(dist / this->aircraft.speed);
-            if (this->user.game_mode == User::GameMode::EASY) flight_time *= 1.5f;
+            if (this->user.game_mode == User::GameMode::EASY) flight_time /= 1.5f;
 
             if ((this->options.max_flight_time > 0 && flight_time > this->options.max_flight_time) ||
                 flight_time < this->options.min_flight_time)
@@ -647,7 +647,7 @@ std::vector<Destination> RoutesSearch::get_sell() const {
             double sell_value = this->aircraft.cost * market_pct;
 
             ar.income = sell_value;
-            ar.profit = sell_value - ar.fuel - ar.co2;
+            ar.profit = sell_value - ar.fuel * this->user.fuel_price / 1000.0;
 
             ar.max_income = ar.income;
             ar.contribution = 0;

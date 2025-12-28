@@ -34,10 +34,10 @@
  * ```
  */
 
+pub mod ferry;
 pub mod schedule;
 pub mod stopover;
 
-// TODO: const generic to silently ignore errors
 use crate::airport::{db::Airports, Airport};
 use crate::route::db::DistanceMatrix;
 use crate::route::Distance;
