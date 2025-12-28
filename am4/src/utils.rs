@@ -25,9 +25,9 @@ impl<T: PartialEq> PartialOrd for Suggestion<T> {
     }
 }
 
-pub fn queue_suggestions<'a, T: PartialEq>(
-    heap: &mut BinaryHeap<Suggestion<&'a T>>,
-    item: &'a T,
+pub fn queue_suggestions<T: PartialEq>(
+    heap: &mut BinaryHeap<Suggestion<T>>,
+    item: T,
     similarity: f64,
 ) {
     if heap.len() < MAX_SUGGESTIONS {

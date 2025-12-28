@@ -12,7 +12,7 @@ pub struct CustomAircraft {
 }
 
 /// A bitset of the specific modification and engine variant
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Modification {
     pub mods: HashSet<Modifier>, // not using Vec to avoid duplicates
     pub engine: EnginePriority,
@@ -78,11 +78,32 @@ impl Default for Modification {
 impl FromStr for Modification {
     type Err = AircraftError;
 
-    /// Parse single-character modifiers between square brackets of the query string.
+    /// Parse modifiers between square brackets: engine priority (digits) and modifier letters.
+    /// Examples: "1", "sfc", "1sfc", "10", "2sfcx"
     fn from_str(s: &str) -> Result<Modification, Self::Err> {
         let mut modifi = Modification::default();
+        let s_lower = s.to_lowercase();
 
-        for c in s.to_lowercase().chars() {
+        let mut digit_start = 0;
+        let mut digit_end = 0;
+        let mut found_digit = false;
+
+        for (i, c) in s_lower.chars().enumerate() {
+            if c.is_ascii_digit() {
+                if !found_digit {
+                    digit_start = i;
+                    found_digit = true;
+                }
+                digit_end = i + 1;
+            }
+        }
+
+        if found_digit {
+            let digit_str = &s_lower[digit_start..digit_end];
+            modifi.engine = EnginePriority::from_str(digit_str)?;
+        }
+
+        for c in s_lower.chars() {
             match c {
                 's' => modifi.mods.insert(Modifier::Speed),
                 'f' => modifi.mods.insert(Modifier::Fuel),
@@ -90,10 +111,7 @@ impl FromStr for Modification {
                 'x' => modifi.mods.insert(Modifier::FourX),
                 'e' => modifi.mods.insert(Modifier::EasyBoost),
                 ' ' | ',' => continue,
-                p => {
-                    modifi.engine = EnginePriority::from_str(&p.to_string())?;
-                    true // just to match the return type of insert
-                }
+                _ => true,
             };
         }
 

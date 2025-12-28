@@ -41,5 +41,8 @@ prepare-data:
 start-web:
     cd am4-web && trunk serve --release --minify
 
+build-web:
+    cd am4-web && trunk build --release --minify
+
 dump params='':
     u dump -i docs -i src/am4/utils/tests -i src/am4/utils/stubs -i src/am4/utils/_official_api -i src/am4/db/pb_data/types.d.ts {{params}}

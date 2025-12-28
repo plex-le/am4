@@ -25,7 +25,7 @@ use crate::aircraft::custom::{CustomAircraft, Modification};
 use crate::aircraft::{Aircraft, AircraftError, EnginePriority, Id, Name, ShortName};
 use crate::utils::{queue_suggestions, Suggestion, MAX_SUGGESTIONS};
 use jaro_winkler::jaro_winkler;
-use std::collections::{BinaryHeap, HashMap};
+use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::str::FromStr;
 use thiserror::Error;
 
@@ -145,6 +145,12 @@ pub struct Aircrafts {
     index: HashMap<SearchKey, AircraftVariants>,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct AircraftSearchResult {
+    pub variants: Vec<Aircraft>,
+    pub modifiers: Modification,
+}
+
 impl Aircrafts {
     #[cfg(feature = "rkyv")]
     pub fn from_bytes(buffer: &[u8]) -> Result<Self, ParseError> {
@@ -198,7 +204,10 @@ impl Aircrafts {
         self.search_by_ctx(&ctx)
     }
 
-    pub fn suggest(&self, s: &str) -> Result<Vec<Suggestion<&Aircraft>>, AircraftSearchError> {
+    pub fn suggest(
+        &self,
+        s: &str,
+    ) -> Result<Vec<Suggestion<AircraftSearchResult>>, AircraftSearchError> {
         let ctx = QueryCtx::from_str(s)?;
         self.suggest_by_ctx(&ctx)
     }
@@ -214,7 +223,7 @@ impl Aircrafts {
     pub fn suggest_by_ctx(
         &self,
         ctx: &QueryCtx,
-    ) -> Result<Vec<Suggestion<&Aircraft>>, AircraftSearchError> {
+    ) -> Result<Vec<Suggestion<AircraftSearchResult>>, AircraftSearchError> {
         // TODO: this is a hack to get the uppercase version of the parsed query
         let key = Result::<SearchKey, AircraftSearchError>::from(ctx)?;
         let su = match key {
@@ -224,18 +233,36 @@ impl Aircrafts {
         };
 
         let mut heap = BinaryHeap::with_capacity(MAX_SUGGESTIONS);
+        let mut seen_shortnames = HashSet::new();
 
-        for (key, variants) in &self.index {
+        for (key, variants_map) in &self.index {
             // only search first engine variant
             // TODO: restrict to only search by shortname if ctx.key is shortname
-            if let Some(i) = variants.values().next() {
+            if let Some(&first_idx) = variants_map.values().next() {
+                let shortname = &self.data[first_idx].shortname;
+                if !seen_shortnames.insert(shortname.clone()) {
+                    continue;
+                }
+
                 let s = match key {
                     SearchKey::ShortName(v) => &v.0,
                     SearchKey::Name(v) => &v.0,
                     _ => continue, // ignore searching by id
                 };
                 let similarity = jaro_winkler(s, &su);
-                queue_suggestions(&mut heap, &self.data[*i], similarity);
+
+                let mut sorted_variants: Vec<Aircraft> = variants_map
+                    .values()
+                    .map(|&idx| self.data[idx].clone())
+                    .collect();
+                sorted_variants.sort_by_key(|a| a.priority.get());
+
+                let result = AircraftSearchResult {
+                    variants: sorted_variants,
+                    modifiers: ctx.modifiers.clone(),
+                };
+
+                queue_suggestions(&mut heap, result, similarity);
             }
         }
 

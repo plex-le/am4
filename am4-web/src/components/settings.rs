@@ -1,7 +1,8 @@
 use crate::console::UserLogger;
 use am4::user::{
-    AircraftLoad, Co2Price, Co2Training, FuelPrice, FuelTraining, GameMode, HeavyTraining,
-    IncomeLossTol, LargeTraining, RepairTraining, Settings, ValidationError, WearTraining,
+    AircraftLoad, AirportCodePref, Co2Price, Co2Training, FuelPrice, FuelTraining, GameMode,
+    HeavyTraining, IncomeLossTol, LargeTraining, RepairTraining, Settings, ValidationError,
+    WearTraining,
 };
 use leptos::prelude::*;
 use leptos::wasm_bindgen::JsCast;
@@ -38,19 +39,18 @@ where
                     let val = target.unchecked_into::<HtmlInputElement>().value();
                     settings
                         .update(|s| {
-                            match update(s, val.clone()) {
-                                Ok(_) => {
-                                    set_invalid.set(false);
-                                    logger
-                                        .info(
-                                            format!(
-                                                "updated setting '{}': {}",
-                                                label.to_lowercase(),
-                                                val,
-                                            ),
-                                        );
-                                }
-                                Err(_) => set_invalid.set(true),
+                            if update(s, val.clone()).is_ok() {
+                                set_invalid.set(false);
+                                logger
+                                    .info(
+                                        format!(
+                                            "updated setting '{}': {}",
+                                            label.to_lowercase(),
+                                            val,
+                                        ),
+                                    );
+                            } else {
+                                set_invalid.set(true);
                             }
                         });
                 }
@@ -95,19 +95,102 @@ pub fn SettingsPanel() -> impl IntoView {
                                 </button>
                             </div>
                         </div>
+                        <div class="mode-toggle">
+                            <span>"Airport Code"</span>
+                            <div class="toggle-options">
+                                <button
+                                    class:active=move || {
+                                        settings.get().airport_code_pref == AirportCodePref::Iata
+                                    }
+                                    on:click=move |_| {
+                                        settings
+                                            .update(|s| s.airport_code_pref = AirportCodePref::Iata);
+                                        logger.info("updated setting 'airport code': IATA");
+                                    }
+                                >
+                                    "IATA"
+                                </button>
+                                <button
+                                    class:active=move || {
+                                        settings.get().airport_code_pref == AirportCodePref::Icao
+                                    }
+                                    on:click=move |_| {
+                                        settings
+                                            .update(|s| s.airport_code_pref = AirportCodePref::Icao);
+                                        logger.info("updated setting 'airport code': ICAO");
+                                    }
+                                >
+                                    "ICAO"
+                                </button>
+                            </div>
+                        </div>
                         <label class="checkbox-label">
-                            "4x Speed"
+                            "Default 4x Speed"
                             <input
                                 type="checkbox"
-                                prop:checked=move || settings.get().fourx
+                                prop:checked=move || settings.get().default_4x
                                 on:change=move |ev| {
                                     let c = ev
                                         .target()
                                         .unwrap()
                                         .unchecked_into::<HtmlInputElement>()
                                         .checked();
-                                    settings.update(|s| s.fourx = c);
-                                    logger.info(format!("updated setting '4x speed': {}", c));
+                                    settings.update(|s| s.default_4x = c);
+                                    logger
+                                        .info(format!("updated setting 'default 4x speed': {}", c));
+                                }
+                            />
+                        </label>
+                        <label class="checkbox-label">
+                            "Default Speed Mod"
+                            <input
+                                type="checkbox"
+                                prop:checked=move || settings.get().default_speed_mod
+                                on:change=move |ev| {
+                                    let c = ev
+                                        .target()
+                                        .unwrap()
+                                        .unchecked_into::<HtmlInputElement>()
+                                        .checked();
+                                    settings.update(|s| s.default_speed_mod = c);
+                                    logger
+                                        .info(
+                                            format!("updated setting 'default speed mod': {}", c),
+                                        );
+                                }
+                            />
+                        </label>
+                        <label class="checkbox-label">
+                            "Default Fuel Mod"
+                            <input
+                                type="checkbox"
+                                prop:checked=move || settings.get().default_fuel_mod
+                                on:change=move |ev| {
+                                    let c = ev
+                                        .target()
+                                        .unwrap()
+                                        .unchecked_into::<HtmlInputElement>()
+                                        .checked();
+                                    settings.update(|s| s.default_fuel_mod = c);
+                                    logger
+                                        .info(format!("updated setting 'default fuel mod': {}", c));
+                                }
+                            />
+                        </label>
+                        <label class="checkbox-label">
+                            "Default CO2 Mod"
+                            <input
+                                type="checkbox"
+                                prop:checked=move || settings.get().default_co2_mod
+                                on:change=move |ev| {
+                                    let c = ev
+                                        .target()
+                                        .unwrap()
+                                        .unchecked_into::<HtmlInputElement>()
+                                        .checked();
+                                    settings.update(|s| s.default_co2_mod = c);
+                                    logger
+                                        .info(format!("updated setting 'default co2 mod': {}", c));
                                 }
                             />
                         </label>

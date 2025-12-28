@@ -110,6 +110,12 @@ impl FromStr for EnginePriority {
     }
 }
 
+impl EnginePriority {
+    pub fn get(&self) -> u8 {
+        self.0
+    }
+}
+
 // TODO: add charter
 #[derive(Debug, Clone, Display, PartialEq)]
 #[cfg_attr(feature = "rkyv", derive(Ra, Rd, Rs))]

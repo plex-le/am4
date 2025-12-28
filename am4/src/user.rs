@@ -52,7 +52,19 @@ pub struct Settings {
     pub load: AircraftLoad,
     pub cargo_load: AircraftLoad,
     pub income_loss_tol: IncomeLossTol,
-    pub fourx: bool,
+    pub default_4x: bool,
+    pub default_speed_mod: bool,
+    pub default_fuel_mod: bool,
+    pub default_co2_mod: bool,
+    pub airport_code_pref: AirportCodePref,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum AirportCodePref {
+    #[default]
+    Iata,
+    Icao,
 }
 
 static DEFAULT_SETTINGS: LazyLock<Settings> = LazyLock::new(Settings::default);

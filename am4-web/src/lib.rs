@@ -3,8 +3,8 @@ mod console;
 mod db;
 
 use am4::user::{GameMode, Settings};
-use components::aircraft::ACSearch;
-use components::airport::APSearch;
+use components::aircraft::{ACDetails, ACSearch};
+use components::airport::{APDetails, APSearch};
 use components::console::ConsoleView;
 use components::help::Help;
 use components::nav::{Header, Page};
@@ -60,15 +60,18 @@ pub fn App() -> impl IntoView {
     });
 
     provide_context(database);
-    provide_context(set_console); // ReadSignal
-    provide_context(console); // ReadSignal
-    provide_context(logger); // Logger
+    provide_context(set_console);
+    provide_context(console);
+    provide_context(logger);
     provide_context(settings);
     provide_context(game_mode);
     provide_context(page);
 
     LocalResource::new(move || async move {
-        logger.info(format!("initialising am4help {}", env!("CARGO_PKG_VERSION")));
+        logger.info(format!(
+            "initialising am4help {}",
+            env!("CARGO_PKG_VERSION")
+        ));
         match Idb::connect()
             .await
             .unwrap()
@@ -104,9 +107,15 @@ pub fn App() -> impl IntoView {
                     >
                         <ConsoleView />
                         <SettingsPanel />
-                        <div id="search-container">
-                            <ACSearch />
-                            <APSearch />
+                        <div id="search-layout">
+                            <div id="input-group">
+                                <ACSearch />
+                                <APSearch />
+                            </div>
+                            <div id="details-pane">
+                                <ACDetails />
+                                <APDetails />
+                            </div>
                         </div>
                     </Show>
                 </Show>

@@ -1,98 +1,139 @@
+use crate::components::format_thousands;
+use crate::components::search::MultiSelect;
 use crate::db::Data;
-use am4::airport::db::AirportSearchError;
 use am4::airport::Airport;
+use am4::user::{AirportCodePref, Settings};
 use leptos::prelude::*;
-use leptos::wasm_bindgen::JsCast;
-use web_sys::HtmlInputElement;
+
+/// Signal for the active airport selection, provided as context
+pub type ActiveAirportSignal = RwSignal<Option<Airport>>;
 
 #[allow(non_snake_case)]
 #[component]
 pub fn APSearch() -> impl IntoView {
-    let (search_term, set_search_term) = signal("".to_string());
-
     let database = expect_context::<StoredValue<Option<Data>>>();
-    let search_results = move || {
-        let s = search_term.get();
+    let selected = RwSignal::new(Vec::<Airport>::new());
+    let active = RwSignal::new(None::<Airport>);
+
+    provide_context(active);
+
+    let search = Callback::new(move |q: String| {
         database.with_value(|db| {
             db.as_ref()
                 .unwrap()
                 .airports
-                .search(s.as_str())
-                .map_or_else(
-                    |e| view! { <APErr e /> }.into_any(),
-                    |ap| view! { <Ap airport=ap /> }.into_any(),
-                )
+                .suggest(&q)
+                .unwrap_or_default()
+                .into_iter()
+                .map(|s| s.item.clone())
+                .collect()
         })
+    });
+
+    let render_option =
+        move |ap: Airport,
+              _idx: usize,
+              _suggestions: Memo<Vec<Airport>>,
+              _highlight_idx: ReadSignal<usize>,
+              _select: Callback<Airport>,
+              _update: Callback<Airport>,
+              _update_all: Callback<Box<dyn Fn(Airport) -> Airport + Send + Sync>>| {
+            view! {
+                <div class="ap-option">
+                    <div class="details">
+                        <div class="row main">
+                            <span class="codes">
+                                {ap.iata.to_string()}" / "{ap.icao.to_string()}
+                            </span>
+                            <span class="sep">" / "</span>
+                            <span class="location">
+                                {ap.country.to_string()}", "{ap.name.to_string()}
+                            </span>
+                        </div>
+                        <div class="row info">
+                            <span class="stat-val rwy">{format_thousands(ap.rwy as u32)}" ft"</span>
+                            <span class="cdot">" ⋅ "</span>
+
+                            <span class="stat-val market">{ap.market}"%"</span>
+                            <span class="cdot">" ⋅ "</span>
+
+                            <span class="stat-val hub-cost">
+                                "$ "{format_thousands(ap.hub_cost)}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            }
+            .into_any()
+        };
+
+    let render_pill = move |ap: Airport, remove: Callback<()>| {
+        let settings = expect_context::<RwSignal<Settings>>();
+        let iata = ap.iata.to_string();
+        let icao = ap.icao.to_string();
+        view! {
+            <div class="ap-pill">
+                <span class="code">
+                    {move || {
+                        if settings.with(|s| s.airport_code_pref == AirportCodePref::Icao) {
+                            icao.clone()
+                        } else {
+                            iata.clone()
+                        }
+                    }}
+                </span>
+                <span
+                    class="remove"
+                    on:click=move |ev| {
+                        ev.stop_propagation();
+                        remove.run(());
+                    }
+                >
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                    >
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </span>
+            </div>
+        }
+        .into_any()
     };
 
     view! {
         <div id="ap-search">
             <label>"Airport"</label>
-            <input
-                type="text"
-                placeholder="Search an airport..."
-                on:input=move |event| {
-                    let target = event.target().unwrap();
-                    let value = target.unchecked_into::<HtmlInputElement>().value();
-                    set_search_term.set(value);
-                }
+            <MultiSelect
+                selected=selected
+                active=active
+                search=search
+                placeholder="Search airports..."
+                render_option=render_option
+                render_pill=render_pill
             />
-
-            <div>{search_results}</div>
         </div>
     }
 }
 
+/// Component that renders the airport details card
+/// Must be rendered inside a component that has APSearch as an ancestor
 #[allow(non_snake_case)]
 #[component]
-fn APErr(e: AirportSearchError) -> impl IntoView {
-    let database = expect_context::<StoredValue<Option<Data>>>();
+pub fn APDetails() -> impl IntoView {
+    let active = expect_context::<ActiveAirportSignal>();
 
-    if let AirportSearchError::AirportNotFound(ctx) = &e {
-        return database
-            .with_value(|db| {
-                let suggs = db.as_ref().unwrap().airports.suggest_by_ctx(ctx);
-
-                view! {
-                    <div>
-                        <p>"Airport not found. Did you mean: "</p>
-                        <ul>
-
-                            {suggs
-                                .unwrap_or_default()
-                                .into_iter()
-                                .map(|sugg| {
-                                    view! {
-                                        <li>
-                                            {sugg.item.iata.to_string()} " / "
-                                            {sugg.item.icao.to_string()} " ("
-                                            {sugg.item.name.to_string()} ", "
-                                            {sugg.item.country.to_string()} ")"
-                                        </li>
-                                    }
-                                })
-                                .collect::<Vec<_>>()}
-
-                        </ul>
-                    </div>
-                }
-            })
-            .into_any();
-    } else if let AirportSearchError::EmptyQuery = &e {
-        return view! { <div></div> }.into_any();
-    }
-    view! {
-        <div>
-            <p>{e.to_string()}</p>
-        </div>
-    }
-    .into_any()
+    view! { {move || active.get().map(|ap| view! { <Ap airport=ap /> })} }
 }
 
-#[allow(dead_code)] // leptos bug
+#[allow(dead_code)]
 #[allow(non_snake_case)]
 #[component]
-fn Ap<'a>(airport: &'a Airport) -> impl IntoView {
+fn Ap(airport: Airport) -> impl IntoView {
     view! {
         <div class="ap-card">
             <h3>
@@ -114,15 +155,15 @@ fn Ap<'a>(airport: &'a Airport) -> impl IntoView {
                 </tr>
                 <tr>
                     <th>"Runway"</th>
-                    <td>{format!("{}", &airport.rwy)}</td>
+                    <td>{format_thousands(airport.rwy as u32)}" ft"</td>
                 </tr>
                 <tr>
                     <th>"Market"</th>
-                    <td>{format!("{}", &airport.market)}</td>
+                    <td>{airport.market}"%"</td>
                 </tr>
                 <tr>
                     <th>"Hub Cost"</th>
-                    <td>{format!("{}", &airport.hub_cost)}</td>
+                    <td>"$ "{format_thousands(airport.hub_cost)}</td>
                 </tr>
                 <tr>
                     <th>"Runway Codes"</th>

@@ -30,7 +30,7 @@ fn test_aircraft_fail_and_suggest(#[case] inp: &str, #[case] expected_shortname:
     let suggs = AIRCRAFTS.suggest(inp);
     assert!(suggs.is_ok());
     assert_eq!(
-        suggs.unwrap()[0].item.shortname.to_string(),
+        suggs.unwrap()[0].item.variants[0].shortname.to_string(),
         expected_shortname
     );
 }
