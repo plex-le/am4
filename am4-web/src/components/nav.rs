@@ -1,60 +1,54 @@
-use crate::db::{Idb, LoadDbProgress};
-use leptos::logging::log;
+use crate::console::UserLogger;
+use crate::db::Idb;
+use am4::user::Settings;
 use leptos::prelude::*;
+use leptos::web_sys;
 
-static VERSION: &str = env!("CARGO_PKG_VERSION");
-
-impl std::fmt::Display for LoadDbProgress {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            LoadDbProgress::Starting => write!(f, "starting"),
-            LoadDbProgress::IDBConnect => write!(f, "idb(connect)"),
-            LoadDbProgress::IDBRead(key) => write!(f, "idb(read): {key}"),
-            LoadDbProgress::IDBWrite(key) => write!(f, "idb(write): {key}"),
-            LoadDbProgress::Fetching(key) => write!(f, "fetch: {key}"),
-            LoadDbProgress::Parsing(key) => write!(f, "parse: {key}"),
-            LoadDbProgress::Loaded => write!(f, ""),
-            LoadDbProgress::Err => write!(f, "error"),
-        }
-    }
+#[derive(Clone, Copy, PartialEq)]
+pub enum Page {
+    Calculator,
+    Help,
 }
 
 #[component]
-#[allow(non_snake_case)]
 pub fn Header() -> impl IntoView {
-    let (progress, set_progress) = signal(LoadDbProgress::Loaded);
-    let prog_str = move || progress.get().to_string();
+    let logger = expect_context::<UserLogger>();
+    let settings = expect_context::<RwSignal<Settings>>();
+    let page = expect_context::<RwSignal<Page>>();
+
     let clear_db = Action::new_local(move |_: &()| async move {
         Idb::connect().await.unwrap().clear().await.unwrap();
-        log!("cleared indexeddb...");
-        // let _ = web_sys::window().unwrap().location().reload();
+        if let Some(ls) = web_sys::window().unwrap().local_storage().unwrap() {
+            let _ = ls.remove_item("am4_settings");
+        }
+        settings.set(Settings::default());
+        logger.info("cleared IndexedDB and settings");
     });
 
     view! {
-        <header role="banner">
+        <header>
             <div id="global-nav">
-                <a href="https://abc8747.github.io/am4/" target="_blank">
+                <a href="https://github.com/abc8747/am4" target="_blank">
                     <img src="/assets/img/logo-64.webp" alt="logo" height="32" width="32" />
                 </a>
                 <div>
-                    <span id="name">AM4Help</span>
-                    <span id="version">" v" {VERSION}</span>
-                    <span id="progress" style="margin-left: 10px; font-size: 0.8em;">
-                        {prog_str}
-                    </span>
+                    <span id="name">"AM4Help"</span>
                 </div>
             </div>
             <div id="local-bar">
                 <nav>
                     <ul>
-                        <li>
-                            <b>
-                                <a href="/">"Home"</a>
-                            </b>
+                        <li
+                            class:active=move || page.get() == Page::Calculator
+                            on:click=move |_| page.set(Page::Calculator)
+                        >
+                            "Calculator"
                         </li>
-                        <li>"Console"</li>
-                        <li>
-                            <a href="https://abc8747.github.io/am4/formulae/">"Formulae"</a>
+                        <li
+                            class:active=move || page.get() == Page::Help
+                            on:click=move |_| page.set(Page::Help)
+                        >
+                            "Help"
                         </li>
                         <li
                             id="reset"

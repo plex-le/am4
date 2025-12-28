@@ -4,6 +4,9 @@ use derive_more::{Constructor, Display, From, Into};
 use thiserror::Error;
 use uuid::Uuid;
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
 #[derive(Debug, Clone, Error)]
 pub enum ValidationError {
     #[error("invalid wear training, must be between 0 and 5 (inclusive)")]
@@ -26,6 +29,7 @@ pub enum ValidationError {
 
 // TODO: escape strings to avoid injection attacks
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct User {
     pub id: Uuid,
     pub username: String,
@@ -39,6 +43,7 @@ pub struct User {
 }
 
 #[derive(Debug, Clone, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Settings {
     pub training: Training,
     pub fuel_price: FuelPrice,
@@ -62,6 +67,7 @@ impl Default for &Settings {
 
 /// The assumed fuel price, for use in profit calculations
 #[derive(Debug, Clone, Copy, PartialEq, From, Into, Constructor)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct FuelPrice(u16);
 
 impl FuelPrice {
@@ -72,6 +78,7 @@ impl FuelPrice {
 
 /// The assumed CO₂, for use in profit calculations
 #[derive(Debug, Clone, Copy, PartialEq, From, Into, Constructor)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Co2Price(u16);
 
 impl Co2Price {
@@ -81,6 +88,7 @@ impl Co2Price {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum GameMode {
     #[default]
     Easy,
@@ -111,6 +119,7 @@ impl GameMode {
 }
 
 #[derive(Debug, Clone, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Training {
     pub wear: WearTraining,
     pub repair: RepairTraining,
@@ -123,6 +132,7 @@ pub struct Training {
 macro_rules! create_newtype {
     ($name:ident, $inner_type:ty) => {
         #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Display, Into)]
+        #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
         pub struct $name($inner_type);
     };
 }
@@ -199,6 +209,7 @@ create_validated_newtype!(FuelTraining, u8, |v| v <= 3, InvalidFuelTraining, 0);
 create_validated_newtype!(Co2Training, u8, |v| v <= 5, InvalidCo2Training, 0);
 
 #[derive(Debug, Clone, PartialEq, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Role {
     #[default]
     User,

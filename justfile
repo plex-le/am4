@@ -3,6 +3,7 @@ fmt:
     uv run --python 3.9 ruff format --check src
     cargo fmt --all
     cargo clippy --all-targets --fix --allow-dirty --allow-staged --all-features
+    leptosfmt am4-web/**/*.rs
 
 check:
     uv run --python 3.9 ruff check src --fix

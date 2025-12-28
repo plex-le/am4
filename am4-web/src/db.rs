@@ -7,7 +7,6 @@ use indexed_db_futures::error::OpenDbError;
 use indexed_db_futures::prelude::*;
 use indexed_db_futures::transaction::TransactionMode;
 use leptos::{
-    logging::log,
     wasm_bindgen::{prelude::*, JsValue},
     web_sys,
 };
@@ -18,18 +17,13 @@ use web_sys::{
     window, Blob, BlobPropertyBag, Response,
 };
 
-#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct Idb {
     database: Database,
 }
 
-// TODO: replace unwrap with proper handling with rkvy parse errors.
-#[allow(dead_code)]
 impl Idb {
-    /// Main database name
     const NAME_DB: &str = "am4help";
-    /// Object store name for all data
     const NAME_STORE: &str = "data";
 
     /// connect to the database and ensure that `am4help/data` object store exists
@@ -59,7 +53,10 @@ impl Idb {
     /// Load a binary file from the IndexedDb. If the blob is not found*,
     /// fetch it from the server and cache it in the IndexedDb.
     /// not found: `Response`* -> `Blob`* -> IndexedDb -> `Blob` -> `ArrayBuffer` -> `Vec<u8>`
-    pub async fn get_blob(&self, k: &str, url: &str) -> Result<Vec<u8>, DatabaseError> {
+    pub async fn get_blob<F>(&self, k: &str, url: &str, log: &F) -> Result<Vec<u8>, DatabaseError>
+    where
+        F: Fn(String),
+    {
         {
             let tx = self
                 .database
@@ -68,11 +65,13 @@ impl Idb {
                 .build()?;
             let store = tx.object_store(Self::NAME_STORE)?;
             if let Some(b) = store.get::<JsValue, _, _>(k).primitive()?.await? {
+                log(format!("idb hit: {k}"));
                 let ab = JsFuture::from(b.dyn_into::<Blob>()?.array_buffer()).await?;
                 return Ok(Uint8Array::new(&ab).to_vec());
             }
         }
 
+        log(format!("downloading: {k}"));
         let b = fetch_bytes(url).await?;
 
         {
@@ -94,7 +93,14 @@ impl Idb {
     /// generate it from the slice of airports and cache it in the indexeddb.
     /// not found: `&[Airport]`* -> `Distances`* (return this) -> `Blob`* -> IndexedDb
     /// found: IndexedDb -> `Blob` -> `ArrayBuffer` -> `Distances`
-    async fn get_distances(&self, aps: &[Airport]) -> Result<DistanceMatrix, DatabaseError> {
+    async fn get_distances<F>(
+        &self,
+        aps: &[Airport],
+        log: &F,
+    ) -> Result<DistanceMatrix, DatabaseError>
+    where
+        F: Fn(String),
+    {
         {
             let tx = self
                 .database
@@ -107,12 +113,14 @@ impl Idb {
                 .primitive()?
                 .await?
             {
+                log(format!("idb hit: {DIST_FILENAME}"));
                 let ab = JsFuture::from(b.dyn_into::<Blob>()?.array_buffer()).await?;
                 let bytes = Uint8Array::new(&ab).to_vec();
                 return Ok(DistanceMatrix::from_bytes(&bytes).unwrap());
             }
         }
 
+        log("calculating distances...".to_string());
         let distances = DistanceMatrix::from_airports(aps);
         let b = distances.to_bytes().unwrap();
 
@@ -138,28 +146,25 @@ impl Idb {
         Ok(distances)
     }
 
-    pub async fn init_db(&self) -> Result<Data, DatabaseError> {
+    pub async fn init_db<F>(&self, log: F) -> Result<Data, DatabaseError>
+    where
+        F: Fn(String),
+    {
         let bytes = self
-            .get_blob(AP_FILENAME, format!("assets/{AP_FILENAME}").as_str())
+            .get_blob(AP_FILENAME, &format!("assets/{AP_FILENAME}"), &log)
             .await?;
         let airports = Airports::from_bytes(&bytes).unwrap();
-        log!("airports: {}", airports.data().len());
+        log(format!("loaded {} airports", airports.data().len()));
 
         let bytes = self
-            .get_blob(AC_FILENAME, format!("assets/{AC_FILENAME}").as_str())
+            .get_blob(AC_FILENAME, &format!("assets/{AC_FILENAME}"), &log)
             .await?;
         let aircrafts = Aircrafts::from_bytes(&bytes).unwrap();
-        log!("aircrafts: {}", aircrafts.data().len());
+        log(format!("loaded {} aircraft", aircrafts.data().len()));
 
-        let distances = self.get_distances(airports.data()).await?;
-        log!("distances: {}", distances.data().len());
-        // let distances = Distances::from_airports(&(airports.data()));
-        // let bytes = self.fetch("routes", "assets/routes.bin", set_progress).await?;
-        // set_progress(LoadDbProgress::Parsing("routes".to_string()));
-        // let routes = Routes::from_bytes(&bytes).unwrap();
-        // log!("routes: {}", routes.data().len());
+        let distances = self.get_distances(airports.data(), &log).await?;
+        log(format!("loaded {} distances", distances.data().len()));
 
-        // set_progress(LoadDbProgress::Loaded);
         Ok(Data {
             aircrafts,
             airports,
@@ -175,21 +180,14 @@ async fn fetch_bytes(path: &str) -> Result<JsValue, DatabaseError> {
     Ok(jsb)
 }
 
-#[allow(dead_code)]
 pub struct Data {
     pub aircrafts: Aircrafts,
     pub airports: Airports,
 }
 
-#[allow(dead_code)]
-#[derive(Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum LoadDbProgress {
     Starting,
-    IDBConnect,
-    IDBRead(String),
-    IDBWrite(String),
-    Fetching(String),
-    Parsing(String),
     Loaded,
     Err,
 }
@@ -205,13 +203,13 @@ pub enum DatabaseError {
 }
 
 impl From<web_sys::DomException> for DatabaseError {
-    fn from(dom_exception: web_sys::DomException) -> Self {
-        Self::Dom(dom_exception)
+    fn from(e: web_sys::DomException) -> Self {
+        Self::Dom(e)
     }
 }
 
 impl From<JsValue> for DatabaseError {
-    fn from(js_value: JsValue) -> Self {
-        Self::Js(js_value)
+    fn from(v: JsValue) -> Self {
+        Self::Js(v)
     }
 }

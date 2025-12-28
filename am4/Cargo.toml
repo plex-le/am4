@@ -21,7 +21,7 @@ rkyv = { version = "0.8.12", optional = true, features = ["bytecheck"] }
 
 [features]
 default = ["rkyv"]
-serde = ["dep:serde"]
+serde = ["dep:serde", "uuid/serde"]
 rkyv = ["dep:rkyv"]
 
 [dev-dependencies]

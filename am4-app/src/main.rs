@@ -47,7 +47,12 @@ fn main() {
         ..Default::default()
     };
 
-    let abstract_routes = Routes::new(&airports, &distances, origin, airports.data());
+    let abstract_routes = Routes::<AbstractRoute, AbstractConfig>::new(
+        &airports,
+        &distances,
+        origin,
+        airports.data(),
+    );
     print_len("abstract", &abstract_routes);
     let concrete_routes = abstract_routes.with_aircraft(&aircraft.aircraft, &GameMode::Easy);
     print_len("concrete", &concrete_routes);
