@@ -4,6 +4,7 @@ mod utils;
 
 use am4::{AC_FILENAME, AP_FILENAME, DEM_FILENAME0, DEM_FILENAME1};
 use polars::frame::row::Row;
+use polars::io::prelude::*;
 use polars::prelude::*;
 
 use std::io::Write;
@@ -14,7 +15,7 @@ use utils::*;
 fn convert_routes(out_dir: &Path) {
     use am4::route::demand::PaxDemand;
 
-    let mut schema = Schema::new();
+    let mut schema = Schema::default();
     schema.with_column("oid".into(), DataType::UInt32);
     schema.with_column("did".into(), DataType::UInt16);
     schema.with_column("yd".into(), DataType::UInt16);
@@ -23,16 +24,18 @@ fn convert_routes(out_dir: &Path) {
     schema.with_column("d".into(), DataType::Float64);
     schema.with_column("rwy".into(), DataType::UInt16);
 
-    let lf = LazyCsvReader::new("../../../../am4-private/community/db-data/routes.csv")
-        .with_has_header(false)
-        .with_schema(Some(Arc::new(schema)))
-        .finish()
-        .unwrap();
+    let lf = LazyCsvReader::new(PlPath::from_str(
+        "../../../../am4-private/community/db-data/routes.csv",
+    ))
+    .with_has_header(false)
+    .with_schema(Some(Arc::new(schema)))
+    .finish()
+    .unwrap();
 
     // v0.1
     let mut df = lf
         .clone()
-        .drop(vec!["oid", "did", "rwy"])
+        .select([col("yd"), col("jd"), col("fd"), col("d")])
         .collect()
         .unwrap();
     let mut file = std::fs::File::create("routes.parquet").unwrap();
@@ -40,7 +43,10 @@ fn convert_routes(out_dir: &Path) {
     dbg!(df);
 
     // v0.2
-    let df = &lf.drop(vec!["oid", "did", "d", "rwy"]).collect().unwrap();
+    let df = &lf
+        .select([col("yd"), col("jd"), col("fd")])
+        .collect()
+        .unwrap();
     let num_rows = df.height();
 
     let mut dems = Vec::<PaxDemand>::with_capacity(num_rows);
@@ -66,7 +72,7 @@ fn convert_routes(out_dir: &Path) {
             println!("processed {i} / {num_rows}");
         }
     }
-    let buf = rkyv::to_bytes::<Vec<PaxDemand>, 45_782_236>(&dems).unwrap();
+    let buf = rkyv::to_bytes::<rkyv::rancor::Error>(&dems).unwrap();
 
     let spl = buf.len() / 2;
     let mut file0 = std::fs::File::create(out_dir.join(DEM_FILENAME0)).unwrap();
@@ -81,7 +87,7 @@ fn convert_routes(out_dir: &Path) {
 fn convert_airports(out_dir: &Path) {
     use am4::airport::{Airport, Iata, Icao, Id, Name, Point};
 
-    let mut schema = Schema::new();
+    let mut schema = Schema::default();
     schema.with_column("id".into(), DataType::UInt16);
     schema.with_column("name".into(), DataType::String);
     schema.with_column("fullname".into(), DataType::String);
@@ -96,11 +102,13 @@ fn convert_airports(out_dir: &Path) {
     schema.with_column("hub_cost".into(), DataType::UInt32);
     schema.with_column("rwy_codes".into(), DataType::String);
 
-    let lf = LazyCsvReader::new("../../../../am4-private/community/db-data/airports.csv")
-        .with_has_header(true)
-        .with_schema(Some(Arc::new(schema)))
-        .finish()
-        .unwrap();
+    let lf = LazyCsvReader::new(PlPath::from_str(
+        "../../../../am4-private/community/db-data/airports.csv",
+    ))
+    .with_has_header(true)
+    .with_schema(Some(Arc::new(schema)))
+    .finish()
+    .unwrap();
 
     let df = &lf.collect().unwrap();
     // v0.1
@@ -144,7 +152,7 @@ fn convert_airports(out_dir: &Path) {
     }
     println!("{:?}", airports.len());
     let mut file = std::fs::File::create(out_dir.join(AP_FILENAME)).unwrap();
-    let b = rkyv::to_bytes::<Vec<Airport>, 518312>(&airports).unwrap();
+    let b = rkyv::to_bytes::<rkyv::rancor::Error>(&airports).unwrap();
     file.write_all(&b).unwrap();
 
     println!("wrote {:?} bytes to {:?}", b.len(), file);
@@ -153,7 +161,7 @@ fn convert_airports(out_dir: &Path) {
 fn convert_aircrafts(out_dir: &Path) {
     use am4::aircraft::{Aircraft, AircraftType, EnginePriority, Id, Name, ShortName};
 
-    let mut schema = Schema::new();
+    let mut schema = Schema::default();
     schema.with_column("id".into(), DataType::UInt16);
     schema.with_column("shortname".into(), DataType::String);
     schema.with_column("manufacturer".into(), DataType::String);
@@ -180,11 +188,13 @@ fn convert_aircrafts(out_dir: &Path) {
     schema.with_column("wingspan".into(), DataType::UInt8);
     schema.with_column("length".into(), DataType::UInt8);
 
-    let lf = LazyCsvReader::new("../../../../am4-private/community/db-data/aircrafts.csv")
-        .with_has_header(true)
-        .with_schema(Some(Arc::new(schema)))
-        .finish()
-        .unwrap();
+    let lf = LazyCsvReader::new(PlPath::from_str(
+        "../../../../am4-private/community/db-data/aircrafts.csv",
+    ))
+    .with_has_header(true)
+    .with_schema(Some(Arc::new(schema)))
+    .finish()
+    .unwrap();
     let df = &lf.collect().unwrap();
 
     // v0.1
@@ -193,7 +203,7 @@ fn convert_aircrafts(out_dir: &Path) {
     //     .finish(&mut df.clone())
     //     .unwrap();
 
-    let web_images = ac_image::process(df.column("img").unwrap(), out_dir);
+    let web_images = ac_image::process(df.column("img").unwrap().as_materialized_series(), out_dir);
 
     let num_rows = df.height();
     let mut aircrafts = Vec::<Aircraft>::with_capacity(num_rows);
@@ -241,7 +251,7 @@ fn convert_aircrafts(out_dir: &Path) {
         });
     }
     let mut file = std::fs::File::create(out_dir.join(AC_FILENAME)).unwrap();
-    let b = rkyv::to_bytes::<Vec<Aircraft>, 56648>(&aircrafts).unwrap();
+    let b = rkyv::to_bytes::<rkyv::rancor::Error>(&aircrafts).unwrap();
     file.write_all(&b).unwrap();
 
     println!("wrote {:?} bytes to {:?}", b.len(), file);
@@ -251,7 +261,7 @@ fn main() {
     let out_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../am4/assets");
     std::fs::create_dir_all(&out_dir).unwrap();
 
-    // convert_routes(&out_dir);
-    // convert_airports(&out_dir);
+    convert_routes(&out_dir);
+    convert_airports(&out_dir);
     convert_aircrafts(&out_dir);
 }

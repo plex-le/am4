@@ -8,7 +8,7 @@ use serde::Deserialize;
 #[derive(Debug, Clone, Copy, PartialEq, Display)]
 #[display("Y{y} J{j} F{f}")]
 #[cfg_attr(feature = "serde", derive(Deserialize))]
-#[cfg_attr(feature = "rkyv", derive(Ra, Rd, Rs), archive(check_bytes))]
+#[cfg_attr(feature = "rkyv", derive(Ra, Rd, Rs))]
 pub struct PaxDemand {
     pub y: u16,
     pub j: u16,

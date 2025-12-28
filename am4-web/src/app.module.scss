@@ -89,7 +89,7 @@ body {
                             }
                         }
 
-                        >li#clear-database {
+                        >li#reset {
                             cursor: pointer;
                             color: rgb(184, 154, 154);
 
@@ -102,38 +102,43 @@ body {
             }
         }
 
-        >main {
-            padding: .75rem;
-            width: 100%;
-            background-color: #0d1117;
-            flex-grow: 1;
+        >#search-container {
             display: flex;
             flex-direction: row;
-            column-gap: .75em;
+            width: 100%;
+            padding: 0.75rem;
+            gap: 0.75rem;
 
             @media (max-width: 768px) {
                 flex-direction: column;
-                row-gap: .75em;
             }
 
-            #ac-search,
-            #ap-search {
-                width: 50%;
-                height: 100%;
+            >#ac-search,
+            >#ap-search {
+                flex: 1;
 
-                @media (max-width: 768px) {
-                    width: 100%;
+                >label {
+                    display: block;
+                    margin-bottom: 0.5rem;
+                    font-weight: bold;
+                    color: #c9d1d9;
                 }
 
                 >input {
-                    padding: .25rem;
                     width: 100%;
-                    border: 1px solid #2b3037;
-                    color: #d4e3ee;
-                    background-color: inherit;
+                    padding: 0.5rem;
+                    background-color: #0d1117;
+                    border: 1px solid #30363d;
+                    color: #c9d1d9;
+                    border-radius: 6px;
+                    font-family: inherit;
                     font-size: 1rem;
-                    font-family: "B612", sans-serif;
-                    border-radius: .375rem;
+
+                    &:focus {
+                        outline: none;
+                        border-color: #58a6ff;
+                        box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.3);
+                    }
                 }
 
                 span.bold {
@@ -170,6 +175,21 @@ body {
                 .err {
                     color: #e9b7b7;
                 }
+            }
+        }
+
+        >main {
+            padding: .75rem;
+            width: 100%;
+            background-color: #0d1117;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: row;
+            column-gap: .75em;
+
+            @media (max-width: 768px) {
+                flex-direction: column;
+                row-gap: .75em;
             }
         }
     }

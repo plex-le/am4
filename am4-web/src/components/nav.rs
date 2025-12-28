@@ -1,4 +1,5 @@
-use crate::db::LoadDbProgress;
+use crate::db::{Idb, LoadDbProgress};
+use leptos::logging::log;
 use leptos::prelude::*;
 
 static VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -21,11 +22,12 @@ impl std::fmt::Display for LoadDbProgress {
 #[component]
 #[allow(non_snake_case)]
 pub fn Header() -> impl IntoView {
-    // let prog_str = move || progress.get().to_string();
-
-    let clear_db = Action::new(|_| async {
-        todo!();
-        // Idb::connect().await.unwrap().clear().await.unwrap();
+    let (progress, set_progress) = signal(LoadDbProgress::Loaded);
+    let prog_str = move || progress.get().to_string();
+    let clear_db = Action::new_local(move |_: &()| async move {
+        Idb::connect().await.unwrap().clear().await.unwrap();
+        log!("cleared indexeddb...");
+        // let _ = web_sys::window().unwrap().location().reload();
     });
 
     view! {
@@ -37,6 +39,9 @@ pub fn Header() -> impl IntoView {
                 <div>
                     <span id="name">AM4Help</span>
                     <span id="version">" v" {VERSION}</span>
+                    <span id="progress" style="margin-left: 10px; font-size: 0.8em;">
+                        {prog_str}
+                    </span>
                 </div>
             </div>
             <div id="local-bar">
@@ -52,13 +57,12 @@ pub fn Header() -> impl IntoView {
                             <a href="https://abc8747.github.io/am4/formulae/">"Formulae"</a>
                         </li>
                         <li
-                            id="clear-database"
+                            id="reset"
                             on:click=move |_| {
-                                clear_db.dispatch(&());
+                                clear_db.dispatch(());
                             }
                         >
-
-                            "Clear Database"
+                            "Reset"
                         </li>
                     </ul>
                 </nav>

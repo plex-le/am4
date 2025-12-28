@@ -26,7 +26,7 @@ use thiserror::Error;
 #[cfg(feature = "rkyv")]
 use crate::utils::ParseError;
 #[cfg(feature = "rkyv")]
-use rkyv::{self, Deserialize};
+use rkyv;
 
 pub const AIRPORT_COUNT: usize = 3907;
 
@@ -133,12 +133,8 @@ pub struct Airports {
 impl Airports {
     #[cfg(feature = "rkyv")]
     pub fn from_bytes(buffer: &[u8]) -> Result<Self, ParseError> {
-        let archived = rkyv::check_archived_root::<Vec<Airport>>(buffer)
+        let data: Vec<Airport> = rkyv::from_bytes::<Vec<Airport>, rkyv::rancor::Error>(buffer)
             .map_err(|e| ParseError::ArchiveError(e.to_string()))?;
-
-        let data: Vec<Airport> = archived
-            .deserialize(&mut rkyv::Infallible)
-            .map_err(|e| ParseError::DeserialiseError(e.to_string()))?;
 
         let mut index = HashMap::<SearchKey, usize>::new();
 

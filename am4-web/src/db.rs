@@ -37,8 +37,7 @@ impl Idb {
         let database = Database::open(Self::NAME_DB)
             .with_on_upgrade_needed(|_event, db| {
                 if !db.object_store_names().any(|n| n == Self::NAME_STORE) {
-                    let _ = db.create_object_store(Self::NAME_STORE);
-                    todo!()
+                    db.create_object_store(Self::NAME_STORE).build()?;
                 }
                 Ok(())
             })
@@ -53,6 +52,7 @@ impl Idb {
             .with_mode(TransactionMode::Readwrite)
             .build()?;
         tx.object_store(Self::NAME_STORE)?.clear()?;
+        tx.commit().await?;
         Ok(())
     }
 
@@ -60,22 +60,33 @@ impl Idb {
     /// fetch it from the server and cache it in the IndexedDb.
     /// not found: `Response`* -> `Blob`* -> IndexedDb -> `Blob` -> `ArrayBuffer` -> `Vec<u8>`
     pub async fn get_blob(&self, k: &str, url: &str) -> Result<Vec<u8>, DatabaseError> {
-        let tx = self
-            .database
-            .transaction(Self::NAME_STORE)
-            .with_mode(TransactionMode::Readwrite)
-            .build()?;
-        let store = tx.object_store(Self::NAME_STORE)?;
-        let jsb = match store.get(k).primitive()?.await? {
-            Some(b) => b,
-            None => {
-                let b = fetch_bytes(url).await?;
-                store.put(&b).with_key(k).await?;
-                tx.commit().await?;
-                b
+        {
+            let tx = self
+                .database
+                .transaction(Self::NAME_STORE)
+                .with_mode(TransactionMode::Readonly)
+                .build()?;
+            let store = tx.object_store(Self::NAME_STORE)?;
+            if let Some(b) = store.get::<JsValue, _, _>(k).primitive()?.await? {
+                let ab = JsFuture::from(b.dyn_into::<Blob>()?.array_buffer()).await?;
+                return Ok(Uint8Array::new(&ab).to_vec());
             }
-        };
-        let ab = JsFuture::from(jsb.dyn_into::<Blob>()?.array_buffer()).await?;
+        }
+
+        let b = fetch_bytes(url).await?;
+
+        {
+            let tx = self
+                .database
+                .transaction(Self::NAME_STORE)
+                .with_mode(TransactionMode::Readwrite)
+                .build()?;
+            let store = tx.object_store(Self::NAME_STORE)?;
+            store.put(&b).with_key(k).await?;
+            tx.commit().await?;
+        }
+
+        let ab = JsFuture::from(b.dyn_into::<Blob>()?.array_buffer()).await?;
         Ok(Uint8Array::new(&ab).to_vec())
     }
 
@@ -84,40 +95,50 @@ impl Idb {
     /// not found: `&[Airport]`* -> `Distances`* (return this) -> `Blob`* -> IndexedDb
     /// found: IndexedDb -> `Blob` -> `ArrayBuffer` -> `Distances`
     async fn get_distances(&self, aps: &[Airport]) -> Result<DistanceMatrix, DatabaseError> {
-        let tx = self
-            .database
-            .transaction(Self::NAME_STORE)
-            .with_mode(TransactionMode::Readwrite)
-            .build()?;
-        let store = tx.object_store(Self::NAME_STORE)?;
-        match store
-            .get::<JsValue, _, _>(DIST_FILENAME)
-            .primitive()?
-            .await?
         {
-            Some(b) => {
+            let tx = self
+                .database
+                .transaction(Self::NAME_STORE)
+                .with_mode(TransactionMode::Readonly)
+                .build()?;
+            let store = tx.object_store(Self::NAME_STORE)?;
+            if let Some(b) = store
+                .get::<JsValue, _, _>(DIST_FILENAME)
+                .primitive()?
+                .await?
+            {
                 let ab = JsFuture::from(b.dyn_into::<Blob>()?.array_buffer()).await?;
                 let bytes = Uint8Array::new(&ab).to_vec();
-                Ok(DistanceMatrix::from_bytes(&bytes).unwrap())
-            }
-            None => {
-                let distances = DistanceMatrix::from_airports(aps);
-                let b = distances.to_bytes().unwrap();
-
-                // https://github.com/rustwasm/wasm-bindgen/issues/1693
-                // effectively, this is `new Blob([new Uint8Array(b)], {type: 'application/octet-stream'})`
-                let ja = Array::new();
-                ja.push(&Uint8Array::from(b.as_slice()).buffer());
-                let opts = BlobPropertyBag::new();
-                opts.set_type("application/octet-stream");
-                let blob = Blob::new_with_u8_array_sequence_and_options(&ja, &opts)?;
-                let _ = store.put(&blob).with_key(DIST_FILENAME);
-                Ok(distances)
+                return Ok(DistanceMatrix::from_bytes(&bytes).unwrap());
             }
         }
+
+        let distances = DistanceMatrix::from_airports(aps);
+        let b = distances.to_bytes().unwrap();
+
+        // https://github.com/rustwasm/wasm-bindgen/issues/1693
+        // effectively, this is `new Blob([new Uint8Array(b)], {type: 'application/octet-stream'})`
+        let ja = Array::new();
+        ja.push(&Uint8Array::from(b.as_slice()).buffer());
+        let opts = BlobPropertyBag::new();
+        opts.set_type("application/octet-stream");
+        let blob = Blob::new_with_u8_array_sequence_and_options(&ja, &opts)?;
+        let val: JsValue = blob.into();
+
+        {
+            let tx = self
+                .database
+                .transaction(Self::NAME_STORE)
+                .with_mode(TransactionMode::Readwrite)
+                .build()?;
+            let store = tx.object_store(Self::NAME_STORE)?;
+            store.put(&val).with_key(DIST_FILENAME).await?;
+            tx.commit().await?;
+        }
+        Ok(distances)
     }
 
-    pub async fn _init_db(&self) -> Result<Data, DatabaseError> {
+    pub async fn init_db(&self) -> Result<Data, DatabaseError> {
         let bytes = self
             .get_blob(AP_FILENAME, format!("assets/{AP_FILENAME}").as_str())
             .await?;

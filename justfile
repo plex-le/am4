@@ -33,3 +33,9 @@ clippy:
 
 build-docs:
     RUSTDOCFLAGS="-D rustdoc::all -A rustdoc::private-doc-tests" cargo doc --package am4 --all-features --no-deps
+
+prepare-data:
+    cd misc/scripts/prepare_data/ && cargo run
+
+start-web:
+    cd am4-web && trunk serve --release --minify

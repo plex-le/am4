@@ -20,7 +20,7 @@ pub enum DistanceError {
 
 /// Distance, km
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Add, Into, Display)]
-#[cfg_attr(feature = "rkyv", derive(Ra, Rd, Rs), archive(check_bytes))]
+#[cfg_attr(feature = "rkyv", derive(Ra, Rd, Rs))]
 #[cfg_attr(feature = "serde", derive(Deserialize))]
 pub struct Distance(f32);
 

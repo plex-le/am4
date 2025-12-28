@@ -23,7 +23,7 @@ pub mod route;
 #[macro_export]
 macro_rules! ac_version {
     () => {
-        "6"
+        "7"
     };
 }
 pub const AC_FILENAME: &str = concat!("aircrafts-v", ac_version!(), ".bin");
@@ -31,7 +31,7 @@ pub const AC_FILENAME: &str = concat!("aircrafts-v", ac_version!(), ".bin");
 #[macro_export]
 macro_rules! ap_version {
     () => {
-        "1"
+        "2"
     };
 }
 pub const AP_FILENAME: &str = concat!("airports-v", ap_version!(), ".bin");
@@ -41,7 +41,7 @@ pub const DIST_FILENAME: &str = concat!("distances-v", ap_version!(), ".bin");
 #[macro_export]
 macro_rules! demand_version {
     () => {
-        "0"
+        "1"
     };
 }
 pub const DEM_FILENAME0: &str = concat!("demands-v", demand_version!(), ".00.bin");

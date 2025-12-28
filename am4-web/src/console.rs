@@ -1,5 +1,3 @@
-use reactive_stores::Store;
-
 #[allow(dead_code)]
 #[derive(Debug, Clone, Default)]
 pub enum Level {
@@ -9,7 +7,7 @@ pub enum Level {
     Success,
 }
 
-#[derive(Debug, Clone, Store)]
+#[derive(Debug, Clone)]
 pub struct Entry {
     pub time: u64,
     pub level: Level,
@@ -17,7 +15,7 @@ pub struct Entry {
     pub message: String,
 }
 
-#[derive(Debug, Clone, Store)]
+#[derive(Debug, Clone)]
 pub struct Console {
     pub history: Vec<Entry>,
 }

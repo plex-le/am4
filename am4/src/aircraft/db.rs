@@ -32,7 +32,7 @@ use thiserror::Error;
 #[cfg(feature = "rkyv")]
 use crate::utils::ParseError;
 #[cfg(feature = "rkyv")]
-use rkyv::{self, Deserialize};
+use rkyv;
 
 pub static LENGTH_MAX: f32 = 77.0;
 pub static LENGTH_MEAN: f32 = 34.278454;
@@ -148,12 +148,8 @@ pub struct Aircrafts {
 impl Aircrafts {
     #[cfg(feature = "rkyv")]
     pub fn from_bytes(buffer: &[u8]) -> Result<Self, ParseError> {
-        let archived = rkyv::check_archived_root::<Vec<Aircraft>>(buffer)
+        let data: Vec<Aircraft> = rkyv::from_bytes::<Vec<Aircraft>, rkyv::rancor::Error>(buffer)
             .map_err(|e| ParseError::ArchiveError(e.to_string()))?;
-
-        let data: Vec<Aircraft> = archived
-            .deserialize(&mut rkyv::Infallible)
-            .map_err(|e| ParseError::DeserialiseError(e.to_string()))?;
 
         let mut index = HashMap::<SearchKey, AircraftVariants>::new();
 

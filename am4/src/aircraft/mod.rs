@@ -11,7 +11,7 @@ use rkyv::{Archive as Ra, Deserialize as Rd, Serialize as Rs};
 use serde::Deserialize;
 
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(feature = "rkyv", derive(Ra, Rd, Rs), archive(check_bytes))]
+#[cfg_attr(feature = "rkyv", derive(Ra, Rd, Rs))]
 #[cfg_attr(feature = "serde", derive(Deserialize))]
 pub struct Aircraft {
     pub id: Id,
@@ -46,7 +46,7 @@ pub struct Aircraft {
 
 /// Internal game aircraft id
 #[derive(Debug, Clone, Copy, Display, PartialEq, Eq, Hash, Constructor, Into)]
-#[cfg_attr(feature = "rkyv", derive(Ra, Rd, Rs), archive(check_bytes))]
+#[cfg_attr(feature = "rkyv", derive(Ra, Rd, Rs))]
 #[cfg_attr(feature = "serde", derive(Deserialize))]
 pub struct Id(u16);
 
@@ -62,7 +62,7 @@ impl FromStr for Id {
 
 /// ICAO 8643 aircraft type designator
 #[derive(Debug, Clone, Display, PartialEq, Eq, Hash, Into)]
-#[cfg_attr(feature = "rkyv", derive(Ra, Rd, Rs), archive(check_bytes))]
+#[cfg_attr(feature = "rkyv", derive(Ra, Rd, Rs))]
 #[cfg_attr(feature = "serde", derive(Deserialize))]
 pub struct ShortName(String);
 
@@ -79,7 +79,7 @@ impl FromStr for ShortName {
 
 /// Name of the aircraft model, e.g. A380-800
 #[derive(Debug, Clone, Display, PartialEq, Eq, Hash, Into)]
-#[cfg_attr(feature = "rkyv", derive(Ra, Rd, Rs), archive(check_bytes))]
+#[cfg_attr(feature = "rkyv", derive(Ra, Rd, Rs))]
 #[cfg_attr(feature = "serde", derive(Deserialize))]
 pub struct Name(String);
 
@@ -96,7 +96,7 @@ impl FromStr for Name {
 
 /// The priority of the engine variant. The engine with the greatest flight speed will be 0.
 #[derive(Debug, Clone, Copy, Display, PartialEq, Eq, Hash, Constructor, Into, From)]
-#[cfg_attr(feature = "rkyv", derive(Ra, Rd, Rs), archive(check_bytes))]
+#[cfg_attr(feature = "rkyv", derive(Ra, Rd, Rs))]
 #[cfg_attr(feature = "serde", derive(Deserialize))]
 pub struct EnginePriority(u8);
 
@@ -112,7 +112,7 @@ impl FromStr for EnginePriority {
 
 // TODO: add charter
 #[derive(Debug, Clone, Display, PartialEq)]
-#[cfg_attr(feature = "rkyv", derive(Ra, Rd, Rs), archive(check_bytes))]
+#[cfg_attr(feature = "rkyv", derive(Ra, Rd, Rs))]
 #[cfg_attr(
     feature = "serde",
     derive(Deserialize),

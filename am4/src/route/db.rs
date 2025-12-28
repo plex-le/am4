@@ -19,7 +19,7 @@ use crate::utils::ParseError;
 use core::ops::Index;
 
 #[cfg(feature = "rkyv")]
-use rkyv::{self, AlignedVec, Deserialize};
+use rkyv::{self, util::AlignedVec};
 
 pub const ROUTE_COUNT: usize = AIRPORT_COUNT * (AIRPORT_COUNT - 1) / 2;
 
@@ -104,12 +104,9 @@ impl DemandMatrix {
     #[cfg(feature = "rkyv")]
     pub fn from_bytes(buffer: &[u8]) -> Result<Self, ParseError> {
         // ensure serialised bytes can be deserialised
-        let archived = rkyv::check_archived_root::<Vec<PaxDemand>>(buffer)
-            .map_err(|e| ParseError::ArchiveError(e.to_string()))?;
-
-        let demands: Vec<PaxDemand> = archived
-            .deserialize(&mut rkyv::Infallible)
-            .map_err(|e| ParseError::DeserialiseError(e.to_string()))?;
+        let demands: Vec<PaxDemand> =
+            rkyv::from_bytes::<Vec<PaxDemand>, rkyv::rancor::Error>(buffer)
+                .map_err(|e| ParseError::ArchiveError(e.to_string()))?;
 
         if demands.len() != ROUTE_COUNT {
             return Err(ParseError::InvalidDataLength {
@@ -142,12 +139,8 @@ impl DistanceMatrix {
     /// Load the distance matrix from a rkyv serialised buffer
     #[cfg(feature = "rkyv")]
     pub fn from_bytes(buffer: &[u8]) -> Result<Self, ParseError> {
-        let archived = rkyv::check_archived_root::<Vec<Distance>>(buffer)
+        let distances: Vec<_> = rkyv::from_bytes::<Vec<Distance>, rkyv::rancor::Error>(buffer)
             .map_err(|e| ParseError::ArchiveError(e.to_string()))?;
-
-        let distances: Vec<_> = archived
-            .deserialize(&mut rkyv::Infallible)
-            .map_err(|e| ParseError::DeserialiseError(e.to_string()))?;
 
         if distances.len() != ROUTE_COUNT {
             return Err(ParseError::InvalidDataLength {
@@ -170,8 +163,8 @@ impl DistanceMatrix {
 
     #[cfg(feature = "rkyv")]
     pub fn to_bytes(&self) -> Result<AlignedVec, ParseError> {
-        let av = rkyv::to_bytes::<Vec<_>, 30_521_492>(&self.0)
-            .map_err(|e| ParseError::SerialiseError(e.to_string()))?;
+        let av = rkyv::to_bytes(&self.0)
+            .map_err(|e: rkyv::rancor::Error| ParseError::SerialiseError(e.to_string()))?;
         Ok(av)
     }
 

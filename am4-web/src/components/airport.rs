@@ -1,29 +1,33 @@
-// use crate::db::Data;
+use crate::db::Data;
 use am4::airport::db::AirportSearchError;
 use am4::airport::Airport;
 use leptos::prelude::*;
-use leptos::{wasm_bindgen::JsCast, *};
+use leptos::wasm_bindgen::JsCast;
 use web_sys::HtmlInputElement;
 
 #[allow(non_snake_case)]
 #[component]
 pub fn APSearch() -> impl IntoView {
-    let (_search_term, set_search_term) = signal("".to_string());
+    let (search_term, set_search_term) = signal("".to_string());
 
-    // let database = expect_context::<StoredValue<Option<Data>>>();
-    // let search_results = move || {
-    //     let s = search_term.get();
-    //     database.with_value(|db| {
-    //         db.as_ref()
-    //             .unwrap()
-    //             .airports
-    //             .search(s.as_str())
-    //             .map_or_else(|e| view! { <APErr e/> }, |ap| view! { <Ap airport=ap/> })
-    //     })
-    // };
+    let database = expect_context::<StoredValue<Option<Data>>>();
+    let search_results = move || {
+        let s = search_term.get();
+        database.with_value(|db| {
+            db.as_ref()
+                .unwrap()
+                .airports
+                .search(s.as_str())
+                .map_or_else(
+                    |e| view! { <APErr e /> }.into_any(),
+                    |ap| view! { <Ap airport=ap /> }.into_any(),
+                )
+        })
+    };
 
     view! {
         <div id="ap-search">
+            <label>"Airport"</label>
             <input
                 type="text"
                 placeholder="Search an airport..."
@@ -34,52 +38,55 @@ pub fn APSearch() -> impl IntoView {
                 }
             />
 
-        // <div>{search_results}</div>
+            <div>{search_results}</div>
         </div>
     }
 }
 
 #[allow(non_snake_case)]
 #[component]
-fn APErr(_e: AirportSearchError) -> impl IntoView {
-    // let database = expect_context::<StoredValue<Option<Data>>>();
+fn APErr(e: AirportSearchError) -> impl IntoView {
+    let database = expect_context::<StoredValue<Option<Data>>>();
 
-    // if let AirportSearchError::AirportNotFound(ctx) = &e {
-    //     return database.with_value(|db| {
-    //         let suggs = db.as_ref().unwrap().airports.suggest_by_ctx(ctx);
+    if let AirportSearchError::AirportNotFound(ctx) = &e {
+        return database
+            .with_value(|db| {
+                let suggs = db.as_ref().unwrap().airports.suggest_by_ctx(ctx);
 
-    //         view! {
-    //             <div>
-    //                 <p>"Airport not found. Did you mean: "</p>
-    //                 <ul>
+                view! {
+                    <div>
+                        <p>"Airport not found. Did you mean: "</p>
+                        <ul>
 
-    //                     {suggs
-    //                         .unwrap_or_default()
-    //                         .into_iter()
-    //                         .map(|sugg| {
-    //                             view! {
-    //                                 <li>
-    //                                     {&sugg.item.iata.to_string()} " / "
-    //                                     {&sugg.item.icao.to_string()} " ("
-    //                                     {&sugg.item.name.to_string()} ", " {&sugg.item.country} ")"
-    //                                 </li>
-    //                             }
-    //                         })
-    //                         .collect::<Vec<_>>()}
+                            {suggs
+                                .unwrap_or_default()
+                                .into_iter()
+                                .map(|sugg| {
+                                    view! {
+                                        <li>
+                                            {sugg.item.iata.to_string()} " / "
+                                            {sugg.item.icao.to_string()} " ("
+                                            {sugg.item.name.to_string()} ", "
+                                            {sugg.item.country.to_string()} ")"
+                                        </li>
+                                    }
+                                })
+                                .collect::<Vec<_>>()}
 
-    //                 </ul>
-    //             </div>
-    //         }
-    //     });
-    // } else if let AirportSearchError::EmptyQuery = &e {
-    //     return view! { <div></div> };
-    // }
-    // view! {
-    //     <div>
-    //         <p>{e.to_string()}</p>
-    //     </div>
-    // }
-    view! { <div>"Under construction"</div> }
+                        </ul>
+                    </div>
+                }
+            })
+            .into_any();
+    } else if let AirportSearchError::EmptyQuery = &e {
+        return view! { <div></div> }.into_any();
+    }
+    view! {
+        <div>
+            <p>{e.to_string()}</p>
+        </div>
+    }
+    .into_any()
 }
 
 #[allow(dead_code)] // leptos bug
@@ -93,7 +100,10 @@ fn Ap<'a>(airport: &'a Airport) -> impl IntoView {
                 {airport.iata.to_string()} " / " {airport.icao.to_string()} ")"
             </h3>
             <table>
-                <tr>1 <th>"Full Name"</th> <td>{airport.fullname.to_string()}</td></tr>
+                <tr>
+                    <th>"Full Name"</th>
+                    <td>{airport.fullname.to_string()}</td>
+                </tr>
                 <tr>
                     <th>"Continent"</th>
                     <td>{airport.continent.to_string()}</td>

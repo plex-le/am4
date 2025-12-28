@@ -11,7 +11,7 @@ use serde::Deserialize;
 
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Deserialize))]
-#[cfg_attr(feature = "rkyv", derive(Ra, Rd, Rs), archive(check_bytes))]
+#[cfg_attr(feature = "rkyv", derive(Ra, Rd, Rs))]
 pub struct Airport {
     /// Index for the demands and distance matrix.
     pub idx: usize,
@@ -35,7 +35,7 @@ pub struct Airport {
 
 #[derive(Debug, Clone, Copy, Display, PartialEq, Eq, Hash, Constructor, Into)]
 #[cfg_attr(feature = "serde", derive(Deserialize))]
-#[cfg_attr(feature = "rkyv", derive(Ra, Rd, Rs), archive(check_bytes))]
+#[cfg_attr(feature = "rkyv", derive(Ra, Rd, Rs))]
 pub struct Id(u16);
 
 impl FromStr for Id {
@@ -48,7 +48,7 @@ impl FromStr for Id {
 
 #[derive(Debug, Clone, Display, PartialEq, Eq, Hash, Into)]
 #[cfg_attr(feature = "serde", derive(Deserialize))]
-#[cfg_attr(feature = "rkyv", derive(Ra, Rd, Rs), archive(check_bytes))]
+#[cfg_attr(feature = "rkyv", derive(Ra, Rd, Rs))]
 pub struct Name(String);
 
 impl FromStr for Name {
@@ -64,7 +64,7 @@ impl FromStr for Name {
 
 #[derive(Debug, Clone, Display, PartialEq, Eq, Hash, Into)]
 #[cfg_attr(feature = "serde", derive(Deserialize))]
-#[cfg_attr(feature = "rkyv", derive(Ra, Rd, Rs), archive(check_bytes))]
+#[cfg_attr(feature = "rkyv", derive(Ra, Rd, Rs))]
 pub struct Iata(String);
 
 impl FromStr for Iata {
@@ -80,7 +80,7 @@ impl FromStr for Iata {
 
 #[derive(Debug, Clone, Display, PartialEq, Eq, Hash, Into)]
 #[cfg_attr(feature = "serde", derive(Deserialize))]
-#[cfg_attr(feature = "rkyv", derive(Ra, Rd, Rs), archive(check_bytes))]
+#[cfg_attr(feature = "rkyv", derive(Ra, Rd, Rs))]
 pub struct Icao(String);
 
 impl FromStr for Icao {
@@ -97,7 +97,7 @@ impl FromStr for Icao {
 #[derive(Debug, Clone, Display, PartialEq)]
 #[display("({lng}, {lat})")]
 #[cfg_attr(feature = "serde", derive(Deserialize))]
-#[cfg_attr(feature = "rkyv", derive(Ra, Rd, Rs), archive(check_bytes))]
+#[cfg_attr(feature = "rkyv", derive(Ra, Rd, Rs))]
 pub struct Point {
     pub lng: f32,
     pub lat: f32,
