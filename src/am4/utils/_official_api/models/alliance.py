@@ -1,21 +1,25 @@
+from __future__ import annotations
 
-from typing import List, Optional
-from pydantic import BaseModel, Field
-from .core import Status
 from datetime import datetime
 
+from pydantic import BaseModel, Field
+
+from .core import Status
+
+
 class Alliance(BaseModel):
-    id: Optional[int] = 0
+    id: int | None = 0
     name: str
     rank: int
     member_count: int = Field(alias="members")
     max_members: int = Field(alias="maxMembers")
-    value: int # broken!
+    value: int  # broken!
     ipo: bool
     min_sv: float = Field(alias="minSV")
 
+
 class Member(BaseModel):
-    id: Optional[int] = 0
+    id: int | None = 0
     username: str = Field(alias="company")
     joined: datetime
     flights: int
@@ -23,9 +27,10 @@ class Member(BaseModel):
     daily_contribution: int = Field(alias="dailyContribution")
     online: datetime
     sv: float = Field(alias="shareValue")
-    season: Optional[int] = 0 # none if alliance not participating in season
+    season: int | None = 0  # none if alliance not participating in season
+
 
 class AllianceResponse(BaseModel):
     status: Status
-    alliance: List[Alliance]
-    members: List[Member]
+    alliance: list[Alliance]
+    members: list[Member]

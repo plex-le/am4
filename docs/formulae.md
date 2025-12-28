@@ -797,7 +797,7 @@ $$
 y_l + 2 j_l + 3 f_l &\text{if pax} \\
 \frac{1}{0.7}l_l + h_l &\text{if cargo}
 \end{cases}}{\text{capacity}} \\
-\mathrm{xp} &= \frac{\mathrm{round}(a + \text{LF} + b d \text{LF}, 5)}{2l + 1}
+\mathrm{xp} &= \frac{\mathrm{round}(a\text{LF} + b d \text{LF}, 5)}{2l + 1}
 \end{align*}
 $$
 

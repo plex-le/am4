@@ -2,15 +2,13 @@ import time
 from typing import Literal, Sequence
 
 import discord
-from discord import AllowedMentions
-from discord.ext import commands
-
 from am4.utils.aircraft import Aircraft
 from am4.utils.airport import Airport
 from am4.utils.demand import CargoDemand, PaxDemand
 from am4.utils.game import User
-from am4.utils.route import AircraftRoute
 from am4.utils.ticket import CargoTicket, PaxTicket, VIPTicket
+from discord import AllowedMentions
+from discord.ext import commands
 
 from ..common import (
     HELP_U_FOURX,

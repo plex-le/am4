@@ -1,5 +1,4 @@
 import pytest
-
 from am4.utils.aircraft import Aircraft
 from am4.utils.game import User
 
@@ -11,7 +10,7 @@ def test_aircraft_search(inp):
     assert a0.ac.shortname == "b744"
 
 
-@pytest.mark.parametrize("inp", ["b7440", "shortname:b7440" "name:B747-4000"])
+@pytest.mark.parametrize("inp", ["b7440", "shortname:b7440", "name:B747-4000"])
 def test_aircraft_fail_and_suggest(inp):
     a0 = Aircraft.search(inp)
     assert not a0.ac.valid

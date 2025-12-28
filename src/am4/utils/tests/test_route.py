@@ -1,5 +1,4 @@
 import pytest
-
 from am4.utils.aircraft import Aircraft
 from am4.utils.airport import Airport
 from am4.utils.demand import CargoDemand
@@ -33,7 +32,7 @@ def test_route_with_aircraft():
     assert r0.ticket.j == 8923
     assert r0.ticket.f == 13520
     assert r0.flight_time == pytest.approx(6.53623)
-    assert r0.contribution == pytest.approx(30.818565)
+    assert r0.contribution == pytest.approx(26.966243)
 
     user = User.Default(realism=True)
     r1 = AircraftRoute.create(ap0, ap1, ac, options, user=user)

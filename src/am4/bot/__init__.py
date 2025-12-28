@@ -1,14 +1,13 @@
 import asyncio
-from pathlib import Path
 
 import discord
+from am4.utils.db import init as utils_init
 from discord.ext import commands
 from discord.ext.commands import Bot
 from loguru import logger
 
 import am4
 from am4.utils import __version__ as am4utils_version
-from am4.utils.db import init as utils_init
 
 from ..config import cfg
 from .channels import channels

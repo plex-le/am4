@@ -1,9 +1,8 @@
 import discord
-from discord.ext import commands
-
 from am4.utils.aircraft import Aircraft
 from am4.utils.airport import Airport
 from am4.utils.route import AircraftRoute, Route, SameOdException
+from discord.ext import commands
 
 from ...config import cfg
 from ..base import BaseCog
@@ -62,7 +61,8 @@ class RouteCog(BaseCog):
     @commands.command(
         brief="Finds information about a route",
         help=(
-            "Finds information about an route given an origin and destination (and optionally the aircraft), examples:```php\n"
+            "Finds information about an route given an origin and destination (and optionally the aircraft), examples:"
+            "```php\n"
             f"{cfg.bot.COMMAND_PREFIX}route hkg lhr\n"
             f"{cfg.bot.COMMAND_PREFIX}route id:3500 egll\n"
             f"{cfg.bot.COMMAND_PREFIX}route vhhh tpe dc910\n"

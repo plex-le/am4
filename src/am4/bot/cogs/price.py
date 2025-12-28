@@ -52,7 +52,7 @@ class PriceCog(BaseCog):
                 return
         t_now = time.time()
         t_start = t_now - t_now % 1800
-        t_expiry_f = f"<t:{int(t_start+1800)}:R>"
+        t_expiry_f = f"<t:{int(t_start + 1800)}:R>"
 
         # format prices and construct embed
         prices = {p[0]: p[1] for p in [price_0, price_1] if p is not None}

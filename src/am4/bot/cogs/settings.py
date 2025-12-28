@@ -1,9 +1,8 @@
 from typing import Literal
 
 import discord
-from discord.ext import commands
-
 from am4.utils.game import User
+from discord.ext import commands
 
 from ...config import cfg
 from ...db.client import pb
@@ -18,7 +17,8 @@ class SettingsCog(BaseCog):
     @commands.group(
         brief="Show, set or reset my settings",
         help=(
-            "Shows setting(s), set a specific value given a *setting key*, or just reset it. For more information:```php\n"
+            "Shows setting(s), set a specific value given a *setting key*, or just reset it. "
+            "For more information:```php\n"
             f"{cfg.bot.COMMAND_PREFIX}help settings show\n"
             f"{cfg.bot.COMMAND_PREFIX}help settings set\n"
             f"{cfg.bot.COMMAND_PREFIX}help settings reset\n"
@@ -35,7 +35,7 @@ class SettingsCog(BaseCog):
 
     @settings.command(
         brief="show all of my settings",
-        help=("Show all settings, example:```php\n" f"{cfg.bot.COMMAND_PREFIX}settings show\n" "```"),
+        help=(f"Show all settings, example:```php\n{cfg.bot.COMMAND_PREFIX}settings show\n```"),
         ignore_extra=False,
     )
     async def show(self, ctx: commands.Context):

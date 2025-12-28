@@ -1,11 +1,10 @@
 from typing import Annotated
 
-from fastapi import HTTPException, Query
-from pydantic import BaseModel, Field
-
 from am4.utils.aircraft import Aircraft
 from am4.utils.game import User
 from am4.utils.route import AircraftRoute
+from fastapi import HTTPException, Query
+from pydantic import BaseModel, Field
 
 from ..common import (
     HELP_AC_ARG0,
@@ -17,6 +16,7 @@ from ..common import (
     HELP_ACRO_TPD_MODE,
     HELP_AP_ARG0,
     HELP_U_ACCUMULATED_COUNT,
+    HELP_U_CARGO_LOAD,
     HELP_U_CO2_PRICE,
     HELP_U_CO2_TRAINING,
     HELP_U_FOURX,
@@ -26,7 +26,6 @@ from ..common import (
     HELP_U_INCOME_LOSS_TOL,
     HELP_U_L_TRAINING,
     HELP_U_LOAD,
-    HELP_U_CARGO_LOAD,
     HELP_U_REPAIR_TRAINING,
     HELP_U_WEAR_TRAINING,
 )
@@ -202,7 +201,7 @@ class FAPIReqACROptions:
                     detail=[
                         {
                             "loc": ["query", "trips_per_day_per_ac"],
-                            "msg": f"Trips per day cannot be specified when `tpd_mode` is `AUTO`: {kw} `STRICT_ALLOW_MULTIPLE_AC` or `STRICT` instead",
+                            "msg": f"Trips per day cannot be specified when `tpd_mode` is `AUTO`: {kw} `STRICT_ALLOW_MULTIPLE_AC` or `STRICT` instead",  # noqa: E501
                             "type": "value_error",
                         }
                     ],

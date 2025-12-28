@@ -106,7 +106,7 @@ for ap, dests in all_dest.items():
 # %%
 for ap, (count, score, income) in sorted(results.items(), key=lambda x: x[1][1], reverse=True):
     ap: Airport
-    print(f"{count} | {score:.0f} | ${income/1e6:>4.0f}M | {ap.icao} | {ap.name}, {ap.country}")
+    print(f"{count} | {score:.0f} | ${income / 1e6:>4.0f}M | {ap.icao} | {ap.name}, {ap.country}")
     if count > 10:
         os.system(f"cp data/a388/{ap.icao}.csv data/{ap.icao}.csv")
 # %%
