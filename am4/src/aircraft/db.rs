@@ -236,34 +236,36 @@ impl Aircrafts {
         let mut seen_shortnames = HashSet::new();
 
         for (key, variants_map) in &self.index {
-            // only search first engine variant
-            // TODO: restrict to only search by shortname if ctx.key is shortname
-            if let Some(&first_idx) = variants_map.values().next() {
-                let shortname = &self.data[first_idx].shortname;
-                if !seen_shortnames.insert(shortname.clone()) {
-                    continue;
-                }
+            let SearchKey::ShortName(shortname_key) = key else {
+                continue;
+            };
 
-                let s = match key {
-                    SearchKey::ShortName(v) => &v.0,
-                    SearchKey::Name(v) => &v.0,
-                    _ => continue, // ignore searching by id
-                };
-                let similarity = jaro_winkler(s, &su);
-
-                let mut sorted_variants: Vec<Aircraft> = variants_map
-                    .values()
-                    .map(|&idx| self.data[idx].clone())
-                    .collect();
-                sorted_variants.sort_by_key(|a| a.priority.get());
-
-                let result = AircraftSearchResult {
-                    variants: sorted_variants,
-                    modifiers: ctx.modifiers.clone(),
-                };
-
-                queue_suggestions(&mut heap, result, similarity);
+            if !seen_shortnames.insert(shortname_key.clone()) {
+                continue;
             }
+
+            let Some(&first_idx) = variants_map.values().next() else {
+                continue;
+            };
+
+            let ac = &self.data[first_idx];
+            let shortname_upper = shortname_key.0.as_str();
+            let name_upper = ac.name.to_string().to_uppercase();
+
+            let similarity = jaro_winkler(shortname_upper, &su).max(jaro_winkler(&name_upper, &su));
+
+            let mut sorted_variants: Vec<Aircraft> = variants_map
+                .values()
+                .map(|&idx| self.data[idx].clone())
+                .collect();
+            sorted_variants.sort_by_key(|a| a.priority.get());
+
+            let result = AircraftSearchResult {
+                variants: sorted_variants,
+                modifiers: ctx.modifiers.clone(),
+            };
+
+            queue_suggestions(&mut heap, result, similarity);
         }
 
         Ok(heap.into_sorted_vec())

@@ -432,7 +432,13 @@ fn Ac(aircraft: Aircraft) -> impl IntoView {
                 </tr>
                 <tr>
                     <th>{"Dimensions"}</th>
-                    <td>{format!("{} m × {} m", aircraft.length, aircraft.wingspan)}</td>
+                    <td>
+                        {if aircraft.length == 0 && aircraft.wingspan == 0 {
+                            "N/A".to_string()
+                        } else {
+                            format!("{} m × {} m", aircraft.length, aircraft.wingspan)
+                        }}
+                    </td>
                 </tr>
             </table>
             <div id="ac-img">
