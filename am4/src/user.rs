@@ -57,6 +57,7 @@ pub struct Settings {
     pub default_fuel_mod: bool,
     pub default_co2_mod: bool,
     pub airport_code_pref: AirportCodePref,
+    pub allow_invalid_tpd: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]

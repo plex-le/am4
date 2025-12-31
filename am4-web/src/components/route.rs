@@ -561,7 +561,7 @@ pub fn RouteList(
             <div class="results-meta">
                 <span>
                     {move || stats.get().count} " routes found in "
-                    {move || format!("~{:0}", stats.get().time_ms)} "ms"
+                    {move || format!("~{:.1}", stats.get().time_ms)} "ms"
                 </span>
                 <div class="pagination">
                     <button
@@ -776,6 +776,9 @@ pub fn RouteCard(route: WebScheduledRoute, show_origin: Signal<bool>) -> impl In
         ],
     };
 
+    let max_tpd = (24.0 / route.flight_time.get()).floor() as u8;
+    let tpd_warning = route.trips_per_day > max_tpd;
+
     let revenue_str = fmt_money(route.revenue);
     let fuel_price = settings.get().fuel_price.get();
     let co2_price = settings.get().co2_price.get();
@@ -841,9 +844,29 @@ pub fn RouteCard(route: WebScheduledRoute, show_origin: Signal<bool>) -> impl In
             <div class="details-text">
                 {fmt_dist(route.total_distance.get())} " (" {ft_str} {dist_pct_str} ")" " ⋅ CI="
                 {route.ci.get()} " ⋅ " {contribution_str.clone()} <br /> {route.trips_per_day}
-                " t/d/ac × " {route.num_aircraft} " ac" " ⋅ " {fmt_money(route.profit)} "/t"
+                " t/d/ac" " × " {route.num_aircraft} " ac" " ⋅ " {fmt_money(route.profit)} "/t"
                 " ⋅ " {fmt_money(route.profit * route.trips_per_day as f32)} "/d/ac"
             </div>
+            <Show when=move || tpd_warning>
+                <div class="warning-text">
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                    >
+                        <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path>
+                        <path d="M12 9v4"></path>
+                        <path d="M12 17h.01"></path>
+                    </svg>
+                    <span>{format!("Exceeds 24hrs (max: {} t/d)", max_tpd)}</span>
+                </div>
+            </Show>
 
             <details class="cost-breakdown">
                 <summary>

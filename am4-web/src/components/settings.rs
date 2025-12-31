@@ -200,6 +200,25 @@ pub fn SettingsPanel() -> impl IntoView {
                                 }
                             />
                         </label>
+                        <label class="checkbox-label">
+                            "Include flights exceeding 24hr"
+                            <input
+                                type="checkbox"
+                                prop:checked=move || settings.get().allow_invalid_tpd
+                                on:change=move |ev| {
+                                    let c = ev
+                                        .target()
+                                        .unwrap()
+                                        .unchecked_into::<HtmlInputElement>()
+                                        .checked();
+                                    settings.update(|s| s.allow_invalid_tpd = c);
+                                    logger
+                                        .info(
+                                            format!("updated setting 'allow invalid tpd': {}", c),
+                                        );
+                                }
+                            />
+                        </label>
                     </div>
 
                     <div class="setting-group">

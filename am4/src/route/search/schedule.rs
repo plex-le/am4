@@ -247,6 +247,7 @@ impl<'a> ConcreteRoutes<'a> {
                 settings.training.h,
                 settings.revenue_loss_tol.get(),
                 *game_mode,
+                settings.allow_invalid_tpd,
             );
 
             match res {
@@ -350,20 +351,17 @@ fn solve_schedule(
     training_h: HeavyTraining,
     revenue_loss_tol: f32,
     game_mode: GameMode,
+    allow_invalid_tpd: bool,
 ) -> Option<SolverResult> {
     let max_tpd_phys = (24.0 / flight_time.get()).floor() as u8;
-    if max_tpd_phys == 0 {
-        return None;
-    }
-    let max_tpd_phys = TripsPerDay::new(max_tpd_phys).unwrap_or(TripsPerDay::new(1).unwrap());
     let tpd_per_ac = match sched_strat.trips_per_day {
         TripsPerDayStrategy::Strict(t) => {
-            if t > max_tpd_phys {
+            if !allow_invalid_tpd && (t.get() > max_tpd_phys) {
                 return None;
             }
             t
         }
-        TripsPerDayStrategy::Maximise => max_tpd_phys,
+        TripsPerDayStrategy::Maximise => TripsPerDay::new(max_tpd_phys)?,
     };
 
     let try_solve = |total_tpd: u32| -> Option<(ConfigVariant, f32)> {

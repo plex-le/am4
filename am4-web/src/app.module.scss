@@ -1129,6 +1129,21 @@ body {
                                 line-height: 1.6;
                             }
 
+                            .warning-text {
+                                display: flex;
+                                align-items: center;
+                                gap: 0.25rem;
+                                color: var(--error);
+                                font-size: 0.85rem;
+                                margin-top: 0.25rem;
+                                font-weight: bold;
+
+                                svg {
+                                    width: 16px;
+                                    height: 16px;
+                                }
+                            }
+
                             .cost-breakdown {
                                 summary {
                                     position: absolute;
