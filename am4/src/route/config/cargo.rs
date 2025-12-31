@@ -15,6 +15,29 @@ pub enum CargoConfigAlgorithm {
     H,
 }
 
+impl std::fmt::Display for CargoConfigAlgorithm {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Auto => write!(f, "auto"),
+            Self::L => write!(f, "l"),
+            Self::H => write!(f, "h"),
+        }
+    }
+}
+
+impl std::str::FromStr for CargoConfigAlgorithm {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "auto" => Ok(Self::Auto),
+            "l" => Ok(Self::L),
+            "h" => Ok(Self::H),
+            _ => Err(()),
+        }
+    }
+}
+
 impl CargoConfig {
     fn calc_l_conf(
         d_pf: PaxDemand,

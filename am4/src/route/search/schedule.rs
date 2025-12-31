@@ -6,7 +6,7 @@ use crate::route::config::{CargoConfig, CargoConfigAlgorithm, PaxConfig, PaxConf
 use crate::route::db::{DemandMatrix, DistanceMatrix};
 use crate::route::demand::PaxDemand;
 use crate::route::metrics::{self, ConfigVariant};
-use crate::route::ticket::{CargoTicket, PaxTicket, Ticket, VIPTicket};
+use crate::route::ticket::{CargoTicket, PaxTicket, Ticket};
 use crate::route::{
     config::ConfigAlgorithm,
     search::{ConcreteRoutes, Routes},
@@ -41,7 +41,7 @@ pub struct ScheduledRoute<'a> {
     pub destination: &'a Airport,
     pub direct_distance: Distance,
     pub stopover: Option<Stopover<'a>>,
-    pub full_distance: Distance,
+    pub total_distance: Distance,
     pub flight_time: FlightTime,
     pub ci: Ci,
     pub contribution: f32,
@@ -51,7 +51,7 @@ pub struct ScheduledRoute<'a> {
     pub config: ConfigVariant,
     pub ticket: Ticket,
 
-    pub income: f32,
+    pub revenue: f32,
     pub fuel: f32,
     pub co2: f32,
     pub acheck_cost: f32,
@@ -79,7 +79,7 @@ pub struct ScheduleConfig<'a> {
 
 struct SolverResult {
     config: ConfigVariant,
-    income_per_trip: f32,
+    revenue_per_trip: f32,
     tpd: TripsPerDay,
     num_ac: NumAircraft,
 }
@@ -110,7 +110,7 @@ impl<'a> ConcreteRoutes<'a> {
                 });
                 continue;
             }
-            let (stopover, full_dist) = if search_config.inflate_distance_with_stopover {
+            let (stopover, total_distance) = if search_config.inflate_distance_with_stopover {
                 let target_dist = match &search_config.distance_filter {
                     Filter::RangeTo(to) => to.end,
                     Filter::Range(r) => r.end,
@@ -160,7 +160,7 @@ impl<'a> ConcreteRoutes<'a> {
             };
 
             // check full distance because stopover may incur a distance penalty
-            if !search_config.distance_filter.contains(&full_dist) {
+            if !search_config.distance_filter.contains(&total_distance) {
                 self.errors.push(FailedRoute {
                     destination: route.destination,
                     error: ScheduleError::DistanceConstraint.into(),
@@ -170,7 +170,7 @@ impl<'a> ConcreteRoutes<'a> {
 
             let mut ci = Ci::MAX;
             let mut speed_val = ac.speed * speed_mult;
-            let mut flight_time = full_dist / Speed::new_unchecked(speed_val);
+            let mut flight_time = total_distance / Speed::new_unchecked(speed_val);
 
             match search_config.ci {
                 CiStrategy::AlignConstraint => {
@@ -183,11 +183,14 @@ impl<'a> ConcreteRoutes<'a> {
 
                     if let Some(target_t) = max_ft {
                         if flight_time < target_t {
-                            ci =
-                                Ci::calculate(full_dist, Speed::new_unchecked(speed_val), target_t);
+                            ci = Ci::calculate(
+                                total_distance,
+                                Speed::new_unchecked(speed_val),
+                                target_t,
+                            );
                             let ci_mult = 0.0035 * ci.get() as f32 + 0.3;
                             speed_val = ac.speed * speed_mult * ci_mult;
-                            flight_time = full_dist / Speed::new_unchecked(speed_val);
+                            flight_time = total_distance / Speed::new_unchecked(speed_val);
                         }
                     }
                 }
@@ -196,7 +199,7 @@ impl<'a> ConcreteRoutes<'a> {
                     if ci != Ci::MAX {
                         let ci_mult = 0.0035 * ci.get() as f32 + 0.3;
                         speed_val = ac.speed * speed_mult * ci_mult;
-                        flight_time = full_dist / Speed::new_unchecked(speed_val);
+                        flight_time = total_distance / Speed::new_unchecked(speed_val);
                     }
                 }
             }
@@ -210,27 +213,30 @@ impl<'a> ConcreteRoutes<'a> {
             }
 
             let ticket = match ac.r#type {
-                AircraftType::Pax => {
-                    Ticket::Pax(PaxTicket::from_optimal(full_dist.get(), *game_mode))
-                }
-                AircraftType::Cargo => {
-                    Ticket::Cargo(CargoTicket::from_optimal(full_dist.get(), *game_mode))
-                }
-                AircraftType::Vip => {
-                    Ticket::VIP(VIPTicket::from_optimal(full_dist.get(), *game_mode))
-                }
+                AircraftType::Pax => Ticket::Pax(PaxTicket::from_optimal(
+                    route.direct_distance.get(),
+                    *game_mode,
+                )),
+                AircraftType::Cargo => Ticket::Cargo(CargoTicket::from_optimal(
+                    route.direct_distance.get(),
+                    *game_mode,
+                )),
+                AircraftType::Vip => Ticket::VIP(PaxTicket::from_optimal_vip(
+                    route.direct_distance.get(),
+                    *game_mode,
+                )),
             };
 
-            let contribution = metrics::contribution(full_dist, *game_mode, ci);
+            let contribution = metrics::contribution(total_distance, *game_mode, ci);
             let acheck = metrics::acheck_cost(ac.check_cost, ac.maint, flight_time, *game_mode);
             let repair = metrics::repair_cost(ac.cost, settings.training.repair);
-            let fuel = metrics::fuel(ac.fuel, full_dist, settings.training.fuel, ci);
+            let fuel = metrics::fuel(ac.fuel, total_distance, settings.training.fuel, ci);
 
             let demand = demand_matrix[(self.config.origin.idx, route.destination.idx)];
             let res = solve_schedule(
                 ac,
                 demand,
-                full_dist,
+                total_distance,
                 &ticket,
                 flight_time,
                 &search_config.schedule,
@@ -239,18 +245,17 @@ impl<'a> ConcreteRoutes<'a> {
                 settings.cargo_load.get(),
                 settings.training.l,
                 settings.training.h,
-                settings.income_loss_tol.get(),
+                settings.revenue_loss_tol.get(),
                 *game_mode,
             );
 
             match res {
                 Some(solver_res) => {
-                    // 7. Final Calculations
                     let co2 = match &solver_res.config {
                         ConfigVariant::Pax(c) => metrics::co2_pax(
                             ac.co2,
                             c,
-                            full_dist,
+                            total_distance,
                             settings.training.co2,
                             settings.load.get(),
                             ci,
@@ -259,7 +264,7 @@ impl<'a> ConcreteRoutes<'a> {
                             ac.co2,
                             ac.capacity,
                             c,
-                            full_dist,
+                            total_distance,
                             settings.training.co2,
                             settings.cargo_load.get(),
                             ci,
@@ -271,13 +276,13 @@ impl<'a> ConcreteRoutes<'a> {
                         + acheck
                         + repair;
 
-                    let profit = solver_res.income_per_trip - expense;
+                    let profit = solver_res.revenue_per_trip - expense;
 
                     routes.push(ScheduledRoute {
                         destination: route.destination,
                         direct_distance: route.direct_distance,
                         stopover,
-                        full_distance: full_dist,
+                        total_distance,
                         flight_time,
                         ci,
                         contribution,
@@ -285,7 +290,7 @@ impl<'a> ConcreteRoutes<'a> {
                         num_aircraft: solver_res.num_ac,
                         config: solver_res.config,
                         ticket,
-                        income: solver_res.income_per_trip,
+                        revenue: solver_res.revenue_per_trip,
                         fuel,
                         co2,
                         acheck_cost: acheck,
@@ -334,7 +339,7 @@ impl<'a> ConcreteRoutes<'a> {
 fn solve_schedule(
     ac: &Aircraft,
     demand: PaxDemand,
-    dist: Distance,
+    full_dist: Distance,
     ticket: &Ticket,
     flight_time: FlightTime,
     sched_strat: &ScheduleStrategy,
@@ -343,7 +348,7 @@ fn solve_schedule(
     cargo_load_factor: f32,
     training_l: LargeTraining,
     training_h: HeavyTraining,
-    income_loss_tol: f32,
+    revenue_loss_tol: f32,
     game_mode: GameMode,
 ) -> Option<SolverResult> {
     let max_tpd_phys = (24.0 / flight_time.get()).floor() as u8;
@@ -373,10 +378,15 @@ fn solve_schedule(
                     PaxConfigAlgorithm::Auto
                 };
 
-                let cfg =
-                    PaxConfig::calculate(pax_dem, ac.capacity as u16, dist.get(), game_mode, alg)?;
+                let cfg = PaxConfig::calculate(
+                    pax_dem,
+                    ac.capacity as u16,
+                    full_dist.get(),
+                    game_mode,
+                    alg,
+                )?;
                 let var = ConfigVariant::Pax(cfg);
-                let inc = metrics::income(
+                let inc = metrics::revenue(
                     &var,
                     ticket,
                     ac.capacity,
@@ -399,7 +409,7 @@ fn solve_schedule(
                 let cfg =
                     CargoConfig::calculate(pax_dem, ac.capacity, training_l, training_h, alg)?;
                 let var = ConfigVariant::Cargo(cfg);
-                let inc = metrics::income(
+                let inc = metrics::revenue(
                     &var,
                     ticket,
                     ac.capacity,
@@ -418,7 +428,7 @@ fn solve_schedule(
             if let Some((c, i)) = try_solve(total_tpd) {
                 return Some(SolverResult {
                     config: c,
-                    income_per_trip: i,
+                    revenue_per_trip: i,
                     tpd: tpd_per_ac,
                     num_ac: *n,
                 });
@@ -431,7 +441,7 @@ fn solve_schedule(
                 if let Some((c, i)) = try_solve(total_tpd) {
                     return Some(SolverResult {
                         config: c,
-                        income_per_trip: i,
+                        revenue_per_trip: i,
                         tpd: TripsPerDay::new(t).unwrap(), // never zero
                         num_ac: *n,
                     });
@@ -439,33 +449,51 @@ fn solve_schedule(
                 t -= 1;
             }
         }
-        (TripsPerDayStrategy::Strict(_), NumAircraftStrategy::Maximise) => {
-            if let Some((mut best_c, mut best_i)) = try_solve(tpd_per_ac.get() as u32) {
-                let mut best_n: u8 = 1;
-                let min_income_threshold = best_i * (1.0 - income_loss_tol);
+        (TripsPerDayStrategy::Strict(_), NumAircraftStrategy::Maximise)
+        | (TripsPerDayStrategy::Maximise, NumAircraftStrategy::Maximise) => {
+            let mut best_res: Option<SolverResult> = None;
+            let mut start_t: u8 = tpd_per_ac.into();
+            let end_t: u8 = 1;
 
-                for n in 2..200u8 {
-                    let total_tpd = (tpd_per_ac.get() as u32) * (n as u32);
-                    if let Some((c, i)) = try_solve(total_tpd) {
-                        if i < min_income_threshold {
+            let is_strict_tpd = matches!(sched_strat.trips_per_day, TripsPerDayStrategy::Strict(_));
+
+            while start_t >= end_t {
+                let current_tpd = TripsPerDay::new(start_t).unwrap();
+
+                // if 1 AC works, we search upwards for N
+                if let Some((mut best_c, mut best_i)) = try_solve(start_t as u32) {
+                    let mut best_n: u8 = 1;
+                    let min_revenue_threshold = best_i * (1.0 - revenue_loss_tol);
+
+                    for n in 2..200u8 {
+                        let total_tpd = (start_t as u32) * (n as u32);
+                        if let Some((c, i)) = try_solve(total_tpd) {
+                            if i < min_revenue_threshold {
+                                break;
+                            }
+                            best_c = c;
+                            best_i = i;
+                            best_n = n;
+                        } else {
                             break;
                         }
-                        best_c = c;
-                        best_i = i;
-                        best_n = n;
-                    } else {
-                        break;
                     }
+                    best_res = Some(SolverResult {
+                        config: best_c,
+                        revenue_per_trip: best_i,
+                        tpd: current_tpd,
+                        num_ac: NumAircraft::new(best_n).unwrap(),
+                    });
+                    break; // found the highest TPD that allows at least 1 AC.
                 }
-                return Some(SolverResult {
-                    config: best_c,
-                    income_per_trip: best_i,
-                    tpd: tpd_per_ac,
-                    num_ac: NumAircraft::new(best_n).unwrap(),
-                });
+
+                if is_strict_tpd {
+                    break;
+                }
+                start_t -= 1;
             }
+            return best_res;
         }
-        _ => return None,
     }
 
     None
@@ -540,7 +568,7 @@ impl Default for CiStrategy {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub enum SortBy {
     #[default]
     ProfitPerAcPerDay,

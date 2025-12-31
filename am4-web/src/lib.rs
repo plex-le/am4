@@ -2,12 +2,15 @@ mod components;
 mod console;
 mod db;
 
+use am4::aircraft::custom::CustomAircraft;
+use am4::airport::Airport;
 use am4::user::{GameMode, Settings};
-use components::aircraft::{ACDetails, ACSearch};
+use components::aircraft::{ACDetails, ACSearch, ACSelection};
 use components::airport::{APDetails, APSearch};
 use components::console::ConsoleView;
 use components::help::Help;
 use components::nav::{Header, Page};
+use components::route::{RouteList, RouteOptions, RouteStats, WebScheduledRoute};
 use components::settings::SettingsPanel;
 
 use console::{ConsoleState, UserLogger};
@@ -17,6 +20,14 @@ use leptos::web_sys;
 
 const SETTINGS_KEY: &str = "am4_settings";
 const GAME_MODE_KEY: &str = "am4_game_mode";
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum DemandsState {
+    Unknown,
+    Checking,
+    Present,
+    Missing,
+}
 
 #[component]
 pub fn App() -> impl IntoView {
@@ -59,6 +70,42 @@ pub fn App() -> impl IntoView {
         }
     });
 
+    let ac_selected = RwSignal::new(Vec::<CustomAircraft>::new());
+    let ap_selected = RwSignal::new(Vec::<Airport>::new());
+    let ac_active = RwSignal::new(None::<ACSelection>);
+    let ap_active = RwSignal::new(None::<Airport>);
+
+    let demands_state = RwSignal::new(DemandsState::Unknown);
+    let loading_demands = RwSignal::new(false);
+
+    let (routes, set_routes) = signal(Vec::<WebScheduledRoute>::new());
+    let (stats, set_stats) = signal(RouteStats::default());
+    let show_origin = Memo::new(move |_| ap_selected.get().len() > 1);
+
+    let load_demands = Action::new_local(move |_: &()| async move {
+        loading_demands.set(true);
+        match Idb::connect()
+            .await
+            .unwrap()
+            .load_demands(|msg| logger.info(msg))
+            .await
+        {
+            Ok(demands) => {
+                database.update_value(|db| {
+                    if let Some(data) = db.as_mut() {
+                        data.demands = Some(demands);
+                    }
+                });
+                demands_state.set(DemandsState::Present);
+                logger.success("demands loaded");
+            }
+            Err(e) => {
+                logger.error(format!("failed to load demands: {e}"));
+            }
+        }
+        loading_demands.set(false);
+    });
+
     provide_context(database);
     provide_context(set_console);
     provide_context(console);
@@ -66,20 +113,26 @@ pub fn App() -> impl IntoView {
     provide_context(settings);
     provide_context(game_mode);
     provide_context(page);
+    provide_context(ac_active);
+    provide_context(ap_active);
 
     LocalResource::new(move || async move {
         logger.info(format!(
             "initialising am4help {}",
             env!("CARGO_PKG_VERSION")
         ));
-        match Idb::connect()
-            .await
-            .unwrap()
-            .init_db(|msg| logger.info(msg))
-            .await
-        {
+        let idb = Idb::connect().await.unwrap();
+        demands_state.set(DemandsState::Checking);
+        let has_demands = idb.has_demands().await.unwrap_or(false);
+
+        match idb.init_db(|msg| logger.info(msg)).await {
             Ok(db) => {
                 database.set_value(Some(db));
+                if has_demands {
+                    load_demands.dispatch(());
+                } else {
+                    demands_state.set(DemandsState::Missing);
+                }
                 set_progress.set(LoadDbProgress::Loaded);
                 logger.success("initialised database");
             }
@@ -109,12 +162,66 @@ pub fn App() -> impl IntoView {
                         <SettingsPanel />
                         <div id="search-layout">
                             <div id="input-group">
-                                <ACSearch />
-                                <APSearch />
+                                <ACSearch selected=ac_selected active=ac_active />
+                                <APSearch selected=ap_selected active=ap_active />
+
+                                <Show
+                                    when=move || demands_state.get() == DemandsState::Present
+                                    fallback=move || {
+                                        view! {
+                                            <Show when=move || {
+                                                demands_state.get() == DemandsState::Missing
+                                            }>
+                                                <div class="demand-prompt">
+                                                    <p>
+                                                        "am4help needs to download a 46 MB database for offline route searching."
+                                                    </p>
+                                                    <button
+                                                        class="download-btn"
+                                                        disabled=move || loading_demands.get()
+                                                        on:click=move |_| {
+                                                            load_demands.dispatch(());
+                                                        }
+                                                    >
+                                                        <svg
+                                                            xmlns="http://www.w3.org/2000/svg"
+                                                            width="20"
+                                                            height="20"
+                                                            viewBox="0 0 24 24"
+                                                            fill="none"
+                                                            stroke="currentColor"
+                                                            stroke-width="2"
+                                                        >
+                                                            <path d="M12 15V3"></path>
+                                                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                                            <path d="m7 10 5 5 5-5"></path>
+                                                        </svg>
+                                                        {move || {
+                                                            if loading_demands.get() {
+                                                                "Downloading..."
+                                                            } else {
+                                                                "Start Download"
+                                                            }
+                                                        }}
+
+                                                    </button>
+                                                </div>
+                                            </Show>
+                                        }
+                                    }
+                                >
+                                    <RouteOptions
+                                        ac_selected=ac_selected
+                                        ap_selected=ap_selected
+                                        set_routes=set_routes
+                                        set_stats=set_stats
+                                    />
+                                </Show>
                             </div>
                             <div id="details-pane">
                                 <ACDetails />
                                 <APDetails />
+                                <RouteList routes=routes stats=stats show_origin=show_origin />
                             </div>
                         </div>
                     </Show>

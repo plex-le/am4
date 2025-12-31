@@ -1,6 +1,6 @@
 [package]
 name = "am4-web"
-version = "0.2.0-alpha.5"
+version = "0.2.0-alpha.6"
 edition = "2021"
 
 [dependencies]
@@ -13,6 +13,7 @@ wasm-bindgen-futures = "0.4.50"
 console_error_panic_hook = "0.1.7"
 uuid = { version = "1.10.0", features = ["v4", "js"] }
 leptos = { version = "0.8.15", features = ["csr"] }
+jiff = { version = "0.2" }
 
 [dependencies.web-sys]
 version = "0.3"
@@ -26,6 +27,7 @@ features = [
     "BlobPropertyBag",
     "Window",
     "Storage",
+    "Performance",
 ]
 
 [package.metadata.leptos]

@@ -23,8 +23,8 @@ pub enum ValidationError {
     InvalidCo2Training,
     #[error("invalid aircraft load, must be between 0.1 and 1.5")]
     InvalidAircraftLoad,
-    #[error("invalid income loss tolerance, must be between 0.0 and 1.0")]
-    InvalidIncomeLossTol,
+    #[error("invalid revenue loss tolerance, must be between 0.0 and 1.0")]
+    InvalidRevenueLossTol,
 }
 
 // TODO: escape strings to avoid injection attacks
@@ -51,7 +51,7 @@ pub struct Settings {
     pub accumulated_count: u16,
     pub load: AircraftLoad,
     pub cargo_load: AircraftLoad,
-    pub income_loss_tol: IncomeLossTol,
+    pub revenue_loss_tol: RevenueLossTol,
     pub default_4x: bool,
     pub default_speed_mod: bool,
     pub default_fuel_mod: bool,
@@ -207,10 +207,10 @@ create_validated_newtype!(
     0.99
 );
 create_validated_newtype!(
-    IncomeLossTol,
+    RevenueLossTol,
     f32,
     |v: f32| v.is_finite() && (0.0..=1.0).contains(&v),
-    InvalidIncomeLossTol,
+    InvalidRevenueLossTol,
     0.0
 );
 create_validated_newtype!(WearTraining, u8, |v| v <= 5, InvalidWearTraining, 0);

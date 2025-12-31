@@ -5,17 +5,13 @@ use am4::airport::Airport;
 use am4::user::{AirportCodePref, Settings};
 use leptos::prelude::*;
 
-/// Signal for the active airport selection, provided as context
-pub type ActiveAirportSignal = RwSignal<Option<Airport>>;
-
 #[allow(non_snake_case)]
 #[component]
-pub fn APSearch() -> impl IntoView {
+pub fn APSearch(
+    #[prop(into)] selected: RwSignal<Vec<Airport>>,
+    #[prop(into)] active: RwSignal<Option<Airport>>,
+) -> impl IntoView {
     let database = expect_context::<StoredValue<Option<Data>>>();
-    let selected = RwSignal::new(Vec::<Airport>::new());
-    let active = RwSignal::new(None::<Airport>);
-
-    provide_context(active);
 
     let search = Callback::new(move |q: String| {
         database.with_value(|db| {
@@ -51,7 +47,7 @@ pub fn APSearch() -> impl IntoView {
                             </span>
                         </div>
                         <div class="row info">
-                            <span class="stat-val rwy">{format_thousands(ap.rwy as u32)}" ft"</span>
+                            <span class="stat-val rwy">{format_thousands(ap.rwy)}" ft"</span>
                             <span class="cdot">" ⋅ "</span>
 
                             <span class="stat-val market">{ap.market}"%"</span>
@@ -107,7 +103,7 @@ pub fn APSearch() -> impl IntoView {
 
     view! {
         <div id="ap-search">
-            <label>"Airport"</label>
+            <label>"Origin"</label>
             <MultiSelect
                 selected=selected
                 active=active
@@ -125,7 +121,7 @@ pub fn APSearch() -> impl IntoView {
 #[allow(non_snake_case)]
 #[component]
 pub fn APDetails() -> impl IntoView {
-    let active = expect_context::<ActiveAirportSignal>();
+    let active = expect_context::<RwSignal<Option<Airport>>>();
 
     view! { {move || active.get().map(|ap| view! { <Ap airport=ap /> })} }
 }
@@ -155,7 +151,7 @@ fn Ap(airport: Airport) -> impl IntoView {
                 </tr>
                 <tr>
                     <th>"Runway"</th>
-                    <td>{format_thousands(airport.rwy as u32)}" ft"</td>
+                    <td>{format_thousands(airport.rwy)}" ft"</td>
                 </tr>
                 <tr>
                     <th>"Market"</th>

@@ -36,7 +36,6 @@ pub fn ConsoleView() -> impl IntoView {
                                 date.get_milliseconds(),
                             );
                             let lvl_class = match entry.level {
-                                Level::Debug => "debug",
                                 Level::Info => "info",
                                 Level::Success => "success",
                                 Level::Error => "error",

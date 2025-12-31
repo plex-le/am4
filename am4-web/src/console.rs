@@ -4,7 +4,6 @@ use web_sys::js_sys::Date;
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub enum Level {
     #[default]
-    Debug,
     Info,
     Success,
     Error,
@@ -13,7 +12,6 @@ pub enum Level {
 impl std::fmt::Display for Level {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Debug => write!(f, "DEBUG"),
             Self::Info => write!(f, "INFO"),
             Self::Success => write!(f, "OK"),
             Self::Error => write!(f, "ERR"),
@@ -50,9 +48,6 @@ impl UserLogger {
         });
     }
 
-    pub fn debug(&self, msg: impl Into<String>) {
-        self.log(Level::Debug, msg);
-    }
     pub fn info(&self, msg: impl Into<String>) {
         self.log(Level::Info, msg);
     }

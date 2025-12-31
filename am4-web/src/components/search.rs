@@ -12,6 +12,7 @@ pub fn MultiSelect<T, ViewOpt, ViewPill>(
     render_pill: ViewPill,
     #[prop(optional, into)] max_items: Option<usize>,
     #[prop(optional, into)] placeholder: String,
+    #[prop(optional, into)] is_selectable: Option<Callback<T, bool>>,
 ) -> impl IntoView
 where
     T: Clone + PartialEq + Send + Sync + 'static,
@@ -59,10 +60,25 @@ where
 
     Effect::new(move |_| {
         suggestions.track();
-        set_highlight_idx.set(0);
+        if let Some(cb) = is_selectable {
+            let suggs = suggestions.get_untracked();
+            if let Some(idx) = suggs.iter().position(|item| cb.run(item.clone())) {
+                set_highlight_idx.set(idx);
+            } else {
+                set_highlight_idx.set(0);
+            }
+        } else {
+            set_highlight_idx.set(0);
+        }
     });
 
     let select = move |item: T| {
+        if let Some(cb) = is_selectable {
+            if !cb.run(item.clone()) {
+                return;
+            }
+        }
+
         selected.update(|s| {
             if let Some(max) = max_items {
                 if s.len() >= max {
@@ -76,6 +92,7 @@ where
         set_query.set(String::new());
         set_pinned.set(None);
         active.set(None);
+        suggestions_override.set(None);
         if let Some(input) = input_ref.get() {
             input.focus().ok();
         }
@@ -113,8 +130,14 @@ where
             "ArrowDown" => {
                 ev.prevent_default();
                 set_highlight_idx.update(|i| {
-                    if *i + 1 < suggs.len() {
-                        *i += 1
+                    let mut next = *i + 1;
+                    while next < suggs.len() {
+                        let ok = is_selectable.is_none_or(|cb| cb.run(suggs[next].clone()));
+                        if ok {
+                            *i = next;
+                            return;
+                        }
+                        next += 1;
                     }
                 });
             }
@@ -122,7 +145,18 @@ where
                 ev.prevent_default();
                 set_highlight_idx.update(|i| {
                     if *i > 0 {
-                        *i -= 1
+                        let mut prev = *i - 1;
+                        loop {
+                            let ok = is_selectable.is_none_or(|cb| cb.run(suggs[prev].clone()));
+                            if ok {
+                                *i = prev;
+                                return;
+                            }
+                            if prev == 0 {
+                                break;
+                            }
+                            prev -= 1;
+                        }
                     }
                 });
             }
@@ -130,7 +164,6 @@ where
                 ev.prevent_default();
                 if let Some(item) = suggs.get(highlight_idx.get()) {
                     select(item.clone());
-                    suggestions_override.set(None);
                 }
             }
             _ => {}

@@ -33,18 +33,47 @@ impl ACSelection {
             Self::Header(_) => None,
         }
     }
-}
 
-/// Signal for the active aircraft selection, provided as context
-pub type ActiveAircraftSignal = RwSignal<Option<ACSelection>>;
+    pub fn to_custom(&self) -> Option<CustomAircraft> {
+        match self {
+            Self::Single(a, m) | Self::Variant(a, m) => Some(
+                CustomAircraft::from_aircraft_and_modifiers(a.clone(), m.clone()),
+            ),
+            Self::Header(_) => None,
+        }
+    }
+}
 
 #[allow(non_snake_case)]
 #[component]
-pub fn ACSearch() -> impl IntoView {
+pub fn ACSearch(
+    #[prop(into)] selected: RwSignal<Vec<CustomAircraft>>,
+    #[prop(into)] active: RwSignal<Option<ACSelection>>,
+) -> impl IntoView {
     let database = expect_context::<StoredValue<Option<Data>>>();
     let settings = expect_context::<RwSignal<Settings>>();
-    let selected = RwSignal::new(Vec::<ACSelection>::new());
-    let active = RwSignal::new(None::<ACSelection>);
+    let internal_selected = RwSignal::new(Vec::<ACSelection>::new());
+
+    Effect::new(move |_| {
+        let external = selected.get();
+        let internal = internal_selected.get_untracked();
+        let mapped: Vec<ACSelection> = external
+            .into_iter()
+            .map(|ca| ACSelection::Single(ca.aircraft, ca.modifiers))
+            .collect();
+        if mapped != internal {
+            internal_selected.set(mapped);
+        }
+    });
+
+    Effect::new(move |_| {
+        let internal = internal_selected.get();
+        let new_external: Vec<CustomAircraft> =
+            internal.iter().filter_map(|s| s.to_custom()).collect();
+        if new_external != selected.get_untracked() {
+            selected.set(new_external);
+        }
+    });
 
     let search = Callback::new(move |q: String| {
         database.with_value(|db| {
@@ -106,7 +135,7 @@ pub fn ACSearch() -> impl IntoView {
                               _idx: usize,
                               suggestions: Memo<Vec<ACSelection>>,
                               highlight_idx: ReadSignal<usize>,
-                              _select: Callback<ACSelection>,
+                              select: Callback<ACSelection>,
                               _update: Callback<ACSelection>,
                               update_all: Callback<
         Box<dyn Fn(ACSelection) -> ACSelection + Send + Sync>,
@@ -123,7 +152,6 @@ pub fn ACSearch() -> impl IntoView {
 
             let make_btn = |m: Modifier, label: &'static str| {
                 let is_active = active_mods.contains(&m);
-
                 view! {
                     <button
                         class:active=is_active
@@ -182,10 +210,10 @@ pub fn ACSearch() -> impl IntoView {
         };
 
         match sel {
-            ACSelection::Header(ref ac) => {
+            ACSelection::Header(ac) => {
                 let group_id = format!("ac-{}", u16::from(ac.id));
                 let header_shortname = ac.shortname.clone();
-
+                let header_shortname_highlight = header_shortname.clone();
                 let is_variant_highlighted = move || {
                     let hi = highlight_idx.get();
                     suggestions.with(|suggs| {
@@ -195,12 +223,28 @@ pub fn ACSearch() -> impl IntoView {
                         false
                     })
                 };
+                let header_click = move |_| {
+                    suggestions.with(|suggs| {
+                        let mut found = false;
+                        for item in suggs.iter() {
+                            if let ACSelection::Variant(v_ac, v_mods) = item {
+                                if v_ac.shortname == header_shortname_highlight {
+                                    select.run(ACSelection::Variant(v_ac.clone(), v_mods.clone()));
+                                    found = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if !found {}
+                    })
+                };
 
                 view! {
                     <div
                         class="ac-option header"
                         data-group=group_id
                         class:variant-highlighted=is_variant_highlighted
+                        on:click=header_click
                     >
                         <div class="main-row">
                             <img
@@ -223,27 +267,51 @@ pub fn ACSearch() -> impl IntoView {
                 }
                 .into_any()
             }
-            ACSelection::Single(ref ac, ref mods) => view! {
-                <div class="ac-option single">
-                    <div class="main-row">
-                        <img class="ac-icon" src=format!("/assets/img/aircraft/{}.webp", ac.img) />
-                        <div class="left">
-                            <span class="name">{format!("{} {}", ac.manufacturer, ac.name)}</span>
-                            <span class="code">{"("}{ac.shortname.to_string()}{")"}</span>
-                        </div>
-                        <div class="right">
-                            <span class="price">{format!("$ {}", format_thousands(ac.cost))}</span>
-                        </div>
-                    </div>
-                    <div class="variant-row">{render_mods(ac, mods)}</div>
-                </div>
-            }
-            .into_any(),
-            ACSelection::Variant(ref ac, ref mods) => {
-                let group_id = format!("ac-{}", u16::from(ac.id));
+            ACSelection::Single(ac, mods) => {
+                let ac_click = ac.clone();
+                let mods_click = mods.clone();
                 view! {
-                    <div class="ac-option variant" data-group=group_id>
-                        <div class="variant-row">{render_mods(ac, mods)}</div>
+                    <div
+                        class="ac-option single"
+                        on:click=move |_| {
+                            select.run(ACSelection::Single(ac_click.clone(), mods_click.clone()))
+                        }
+                    >
+                        <div class="main-row">
+                            <img
+                                class="ac-icon"
+                                src=format!("/assets/img/aircraft/{}.webp", ac.img)
+                            />
+                            <div class="left">
+                                <span class="name">
+                                    {format!("{} {}", ac.manufacturer, ac.name)}
+                                </span>
+                                <span class="code">{"("}{ac.shortname.to_string()}{")"}</span>
+                            </div>
+                            <div class="right">
+                                <span class="price">
+                                    {format!("$ {}", format_thousands(ac.cost))}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="variant-row">{render_mods(&ac, &mods)}</div>
+                    </div>
+                }
+                .into_any()
+            }
+            ACSelection::Variant(ac, mods) => {
+                let group_id = format!("ac-{}", u16::from(ac.id));
+                let ac_click = ac.clone();
+                let mods_click = mods.clone();
+                view! {
+                    <div
+                        class="ac-option variant"
+                        data-group=group_id
+                        on:click=move |_| {
+                            select.run(ACSelection::Variant(ac_click.clone(), mods_click.clone()))
+                        }
+                    >
+                        <div class="variant-row">{render_mods(&ac, &mods)}</div>
                     </div>
                 }
                 .into_any()
@@ -254,7 +322,6 @@ pub fn ACSearch() -> impl IntoView {
     let render_pill = move |sel: ACSelection, remove: Callback<()>| {
         let ac = sel.aircraft();
         let mods = sel.modification();
-
         let mod_str = if let Some(m) = mods {
             let mut s = String::new();
             if m.mods.contains(&Modifier::Speed) {
@@ -278,7 +345,6 @@ pub fn ACSearch() -> impl IntoView {
             Some(m) if m.engine.get() != 0 => m.engine.get().to_string(),
             _ => String::new(),
         };
-
         let suffix = if !prio.is_empty() || !mod_str.is_empty() {
             format!("[{}{}]", prio, mod_str)
         } else {
@@ -315,31 +381,29 @@ pub fn ACSearch() -> impl IntoView {
         .into_any()
     };
 
-    provide_context(active);
+    let is_selectable = Callback::new(|item: ACSelection| !matches!(item, ACSelection::Header(_)));
 
     view! {
         <div id="ac-search">
             <label>"Aircraft"</label>
             <MultiSelect
-                selected=selected
+                selected=internal_selected
                 active=active
                 search=search
                 max_items=1usize
                 placeholder="Search aircraft..."
                 render_option=render_option
                 render_pill=render_pill
+                is_selectable=is_selectable
             />
         </div>
     }
 }
 
-/// Component that renders the aircraft details card
-/// Must be rendered inside a component that has ACSearch as an ancestor
 #[allow(non_snake_case)]
 #[component]
 pub fn ACDetails() -> impl IntoView {
-    let active = expect_context::<ActiveAircraftSignal>();
-
+    let active = expect_context::<RwSignal<Option<ACSelection>>>();
     view! {
         {move || {
             active
@@ -399,11 +463,11 @@ fn Ac(aircraft: Aircraft) -> impl IntoView {
                 </tr>
                 <tr>
                     <th>{"Range"}</th>
-                    <td>{format_thousands(aircraft.range as u32)} " km"</td>
+                    <td>{format_thousands(aircraft.range)} " km"</td>
                 </tr>
                 <tr>
                     <th>{"Runway"}</th>
-                    <td>{format_thousands(aircraft.rwy as u32)} " ft"</td>
+                    <td>{format_thousands(aircraft.rwy)} " ft"</td>
                 </tr>
                 <tr>
                     <th>{"Check cost"}</th>
@@ -415,7 +479,7 @@ fn Ac(aircraft: Aircraft) -> impl IntoView {
                 </tr>
                 <tr>
                     <th>{"Ceiling"}</th>
-                    <td>{format_thousands(aircraft.ceil as u32)} " ft"</td>
+                    <td>{format_thousands(aircraft.ceil)} " ft"</td>
                 </tr>
                 <tr>
                     <th>{"Personnel"}</th>
@@ -427,7 +491,6 @@ fn Ac(aircraft: Aircraft) -> impl IntoView {
                             aircraft.engineers,
                             aircraft.technicians,
                         )}
-
                     </td>
                 </tr>
                 <tr>

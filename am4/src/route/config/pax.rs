@@ -23,6 +23,37 @@ pub enum PaxConfigAlgorithm {
     Yjf,
 }
 
+impl std::fmt::Display for PaxConfigAlgorithm {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Auto => write!(f, "auto"),
+            Self::Fjy => write!(f, "fjy"),
+            Self::Fyj => write!(f, "fyj"),
+            Self::Jfy => write!(f, "jfy"),
+            Self::Jyf => write!(f, "jyf"),
+            Self::Yfj => write!(f, "yfj"),
+            Self::Yjf => write!(f, "yjf"),
+        }
+    }
+}
+
+impl std::str::FromStr for PaxConfigAlgorithm {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "auto" => Ok(Self::Auto),
+            "fjy" => Ok(Self::Fjy),
+            "fyj" => Ok(Self::Fyj),
+            "jfy" => Ok(Self::Jfy),
+            "jyf" => Ok(Self::Jyf),
+            "yfj" => Ok(Self::Yfj),
+            "yjf" => Ok(Self::Yjf),
+            _ => Err(()),
+        }
+    }
+}
+
 impl PaxConfig {
     /// Implements a greedy configuration algorithm for pax aircraft.
     /// Returns None if demand is exhausted.

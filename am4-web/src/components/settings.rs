@@ -1,7 +1,7 @@
 use crate::console::UserLogger;
 use am4::user::{
     AircraftLoad, AirportCodePref, Co2Price, Co2Training, FuelPrice, FuelTraining, GameMode,
-    HeavyTraining, IncomeLossTol, LargeTraining, RepairTraining, Settings, ValidationError,
+    HeavyTraining, LargeTraining, RepairTraining, RevenueLossTol, Settings, ValidationError,
     WearTraining,
 };
 use leptos::prelude::*;
@@ -22,7 +22,7 @@ where
 {
     let settings = expect_context::<RwSignal<Settings>>();
     let logger = expect_context::<UserLogger>();
-    let (is_invalid, set_invalid) = signal(false);
+    let (error_msg, set_error) = signal(None::<String>);
 
     view! {
         <label>
@@ -32,29 +32,35 @@ where
                 min=min
                 max=max
                 step=step
-                class:invalid=is_invalid
+                class:invalid=move || error_msg.get().is_some()
                 prop:value=value
+                on:input=move |_| {
+                    set_error.set(None);
+                }
                 on:change=move |ev| {
                     let target = ev.target().unwrap();
                     let val = target.unchecked_into::<HtmlInputElement>().value();
                     settings
                         .update(|s| {
-                            if update(s, val.clone()).is_ok() {
-                                set_invalid.set(false);
-                                logger
-                                    .info(
-                                        format!(
-                                            "updated setting '{}': {}",
-                                            label.to_lowercase(),
-                                            val,
-                                        ),
-                                    );
-                            } else {
-                                set_invalid.set(true);
+                            match update(s, val.clone()) {
+                                Ok(_) => {
+                                    set_error.set(None);
+                                    logger
+                                        .info(
+                                            format!(
+                                                "updated setting '{}': {}",
+                                                label.to_lowercase(),
+                                                val,
+                                            ),
+                                        );
+                                }
+                                Err(e) => {
+                                    set_error.set(Some(e));
+                                }
                             }
                         });
                 }
-            />
+            /> {move || { error_msg.get().map(|e| view! { <span class="input-error">{e}</span> }) }}
         </label>
     }
 }
@@ -204,7 +210,7 @@ pub fn SettingsPanel() -> impl IntoView {
                             update=|s, v| {
                                 v.parse::<u16>()
                                     .map(|x| s.fuel_price = FuelPrice::from(x))
-                                    .map_err(|_| "err".into())
+                                    .map_err(|_| "Invalid integer".into())
                             }
                         />
                         <ValidatedInput
@@ -213,7 +219,7 @@ pub fn SettingsPanel() -> impl IntoView {
                             update=|s, v| {
                                 v.parse::<u16>()
                                     .map(|x| s.co2_price = Co2Price::from(x))
-                                    .map_err(|_| "err".into())
+                                    .map_err(|_| "Invalid integer".into())
                             }
                         />
                     </div>
@@ -230,7 +236,7 @@ pub fn SettingsPanel() -> impl IntoView {
                                     .map_err(|_| ValidationError::InvalidFuelTraining)
                                     .and_then(FuelTraining::new)
                                     .map(|x| s.training.fuel = x)
-                                    .map_err(|_| "err".into())
+                                    .map_err(|e| e.to_string())
                             }
                         />
                         <ValidatedInput
@@ -243,7 +249,7 @@ pub fn SettingsPanel() -> impl IntoView {
                                     .map_err(|_| ValidationError::InvalidCo2Training)
                                     .and_then(Co2Training::new)
                                     .map(|x| s.training.co2 = x)
-                                    .map_err(|_| "err".into())
+                                    .map_err(|e| e.to_string())
                             }
                         />
                         <ValidatedInput
@@ -256,7 +262,7 @@ pub fn SettingsPanel() -> impl IntoView {
                                     .map_err(|_| ValidationError::InvalidRepairTraining)
                                     .and_then(RepairTraining::new)
                                     .map(|x| s.training.repair = x)
-                                    .map_err(|_| "err".into())
+                                    .map_err(|e| e.to_string())
                             }
                         />
                         <ValidatedInput
@@ -269,7 +275,7 @@ pub fn SettingsPanel() -> impl IntoView {
                                     .map_err(|_| ValidationError::InvalidWearTraining)
                                     .and_then(WearTraining::new)
                                     .map(|x| s.training.wear = x)
-                                    .map_err(|_| "err".into())
+                                    .map_err(|e| e.to_string())
                             }
                         />
                         <ValidatedInput
@@ -282,7 +288,7 @@ pub fn SettingsPanel() -> impl IntoView {
                                     .map_err(|_| ValidationError::InvalidLargeTraining)
                                     .and_then(LargeTraining::new)
                                     .map(|x| s.training.l = x)
-                                    .map_err(|_| "err".into())
+                                    .map_err(|e| e.to_string())
                             }
                         />
                         <ValidatedInput
@@ -295,7 +301,7 @@ pub fn SettingsPanel() -> impl IntoView {
                                     .map_err(|_| ValidationError::InvalidHeavyTraining)
                                     .and_then(HeavyTraining::new)
                                     .map(|x| s.training.h = x)
-                                    .map_err(|_| "err".into())
+                                    .map_err(|e| e.to_string())
                             }
                         />
                     </div>
@@ -311,7 +317,7 @@ pub fn SettingsPanel() -> impl IntoView {
                                     .map_err(|_| ValidationError::InvalidAircraftLoad)
                                     .and_then(AircraftLoad::new)
                                     .map(|x| s.load = x)
-                                    .map_err(|_| "err".into())
+                                    .map_err(|e| e.to_string())
                             }
                         />
                         <ValidatedInput
@@ -323,19 +329,19 @@ pub fn SettingsPanel() -> impl IntoView {
                                     .map_err(|_| ValidationError::InvalidAircraftLoad)
                                     .and_then(AircraftLoad::new)
                                     .map(|x| s.cargo_load = x)
-                                    .map_err(|_| "err".into())
+                                    .map_err(|e| e.to_string())
                             }
                         />
                         <ValidatedInput
                             label="Loss Tolerance"
                             step="0.001"
-                            value=move || format!("{:.3}", settings.get().income_loss_tol.get())
+                            value=move || format!("{:.3}", settings.get().revenue_loss_tol.get())
                             update=|s, v| {
                                 v.parse::<f32>()
-                                    .map_err(|_| ValidationError::InvalidIncomeLossTol)
-                                    .and_then(IncomeLossTol::new)
-                                    .map(|x| s.income_loss_tol = x)
-                                    .map_err(|_| "err".into())
+                                    .map_err(|_| ValidationError::InvalidRevenueLossTol)
+                                    .and_then(RevenueLossTol::new)
+                                    .map(|x| s.revenue_loss_tol = x)
+                                    .map_err(|e| e.to_string())
                             }
                         />
                     </div>

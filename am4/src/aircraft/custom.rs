@@ -5,7 +5,7 @@ use std::str::FromStr;
 
 /// An [aircraft][Aircraft] that is modified from the base model, for example,
 /// by upgrading the engine or changing the game mode.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct CustomAircraft {
     pub aircraft: Aircraft, // owned for now
     pub modifiers: Modification,

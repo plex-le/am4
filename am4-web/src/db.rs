@@ -1,7 +1,7 @@
 use am4::aircraft::db::Aircrafts;
 use am4::airport::{db::Airports, Airport};
-use am4::route::db::DistanceMatrix;
-use am4::{AC_FILENAME, AP_FILENAME, DIST_FILENAME};
+use am4::route::db::{DemandMatrix, DistanceMatrix};
+use am4::{AC_FILENAME, AP_FILENAME, DEM_FILENAME0, DEM_FILENAME1, DIST_FILENAME};
 use indexed_db_futures::database::Database;
 use indexed_db_futures::error::OpenDbError;
 use indexed_db_futures::prelude::*;
@@ -146,6 +146,32 @@ impl Idb {
         Ok(distances)
     }
 
+    /// Check if demands key exists in IDB without loading it
+    pub async fn has_demands(&self) -> Result<bool, DatabaseError> {
+        let tx = self
+            .database
+            .transaction(Self::NAME_STORE)
+            .with_mode(TransactionMode::Readonly)
+            .build()?;
+        let store = tx.object_store(Self::NAME_STORE)?;
+        let count = store.count().with_query(DEM_FILENAME0).primitive()?.await?;
+        Ok(count > 0)
+    }
+
+    pub async fn load_demands<F>(&self, log: F) -> Result<DemandMatrix, DatabaseError>
+    where
+        F: Fn(String),
+    {
+        let mut b0 = self
+            .get_blob(DEM_FILENAME0, &format!("assets/{DEM_FILENAME0}"), &log)
+            .await?;
+        let b1 = self
+            .get_blob(DEM_FILENAME1, &format!("assets/{DEM_FILENAME1}"), &log)
+            .await?;
+        b0.extend(b1);
+        Ok(DemandMatrix::from_bytes(&b0).unwrap())
+    }
+
     pub async fn init_db<F>(&self, log: F) -> Result<Data, DatabaseError>
     where
         F: Fn(String),
@@ -168,6 +194,8 @@ impl Idb {
         Ok(Data {
             aircrafts,
             airports,
+            distances,
+            demands: None,
         })
     }
 }
@@ -180,9 +208,12 @@ async fn fetch_bytes(path: &str) -> Result<JsValue, DatabaseError> {
     Ok(jsb)
 }
 
+#[derive(Debug)]
 pub struct Data {
     pub aircrafts: Aircrafts,
     pub airports: Airports,
+    pub distances: DistanceMatrix,
+    pub demands: Option<DemandMatrix>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
