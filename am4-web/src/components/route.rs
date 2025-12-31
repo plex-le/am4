@@ -18,6 +18,7 @@ use am4::utils::Filter;
 use leptos::html::Select;
 use leptos::prelude::*;
 use std::num::NonZeroU8;
+use std::str::FromStr;
 
 #[derive(Clone, Default, PartialEq, Copy)]
 pub struct RouteStats {
@@ -226,7 +227,6 @@ pub fn RouteOptions(
 
     let ac_type = Memo::new(move |_| ac_selected.get().first().map(|c| c.aircraft.r#type.clone()));
 
-    // Disable stopover if no max distance
     Effect::new(move |_| {
         let max = dist_max.get();
         if max.trim().is_empty() && stopover_mode.get_untracked() {
@@ -264,17 +264,17 @@ pub fn RouteOptions(
             return;
         }
 
-        // Apply modifications
         let custom_ac = ac_sel[0].effective();
 
-        let parse_range = |min: String, max: String, error_sig: &WriteSignal<Option<String>>| {
+        let parse_range = |min: String,
+                           max: String,
+                           error_sig: &WriteSignal<Option<String>>,
+                           parser: &dyn Fn(&str) -> Result<f32, String>| {
             let parse_val = |s: &str| -> Result<Option<f32>, String> {
                 if s.trim().is_empty() {
                     return Ok(None);
                 }
-                s.parse::<f32>()
-                    .map(Some)
-                    .map_err(|_| "Invalid number".to_string())
+                parser(s).map(Some)
             };
 
             let min_res = parse_val(&min);
@@ -302,21 +302,29 @@ pub fn RouteOptions(
             }
         };
 
-        let dist_filter = if let Some((l, r)) = parse_range(d_min, d_max, &set_dist_error) {
-            match (l, r) {
-                (Some(min), Some(max)) => {
-                    Filter::Range(Distance::new_unchecked(min)..Distance::new_unchecked(max))
-                }
-                (Some(min), None) => Filter::RangeFrom(Distance::new_unchecked(min)..),
-                (None, Some(max)) => Filter::RangeTo(..Distance::new_unchecked(max)),
-                (None, None) => Filter::RangeFull,
-            }
-        } else {
-            return; // Validation failed
+        let dist_parser = |s: &str| s.parse::<f32>().map_err(|_| "Invalid number".to_string());
+        let ft_parser = |s: &str| {
+            FlightTime::from_str(s)
+                .map(|ft| ft.get())
+                .map_err(|_| "Invalid format".to_string())
         };
 
+        let dist_filter =
+            if let Some((l, r)) = parse_range(d_min, d_max, &set_dist_error, &dist_parser) {
+                match (l, r) {
+                    (Some(min), Some(max)) => {
+                        Filter::Range(Distance::new_unchecked(min)..Distance::new_unchecked(max))
+                    }
+                    (Some(min), None) => Filter::RangeFrom(Distance::new_unchecked(min)..),
+                    (None, Some(max)) => Filter::RangeTo(..Distance::new_unchecked(max)),
+                    (None, None) => Filter::RangeFull,
+                }
+            } else {
+                return;
+            };
+
         let ft_max_specified = !f_max.trim().is_empty();
-        let ft_filter = if let Some((l, r)) = parse_range(f_min, f_max, &set_ft_error) {
+        let ft_filter = if let Some((l, r)) = parse_range(f_min, f_max, &set_ft_error, &ft_parser) {
             match (l, r) {
                 (Some(min), Some(max)) => {
                     Filter::Range(FlightTime::new_unchecked(min)..FlightTime::new_unchecked(max))
@@ -326,7 +334,7 @@ pub fn RouteOptions(
                 (None, None) => Filter::RangeFull,
             }
         } else {
-            return; // Validation failed
+            return;
         };
 
         let num_ac_strat = if n_ac_is_max {

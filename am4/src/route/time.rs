@@ -1,6 +1,7 @@
 use crate::utils::{PositiveReal, PositiveRealError};
 use derive_more::{Add, Display, Into};
 use std::num::ParseFloatError;
+use std::str::FromStr;
 use thiserror::Error;
 
 #[derive(Debug, Clone, Error)]
@@ -9,6 +10,8 @@ pub enum FlightTimeError {
     ParseError(#[source] ParseFloatError),
     #[error(transparent)]
     FloatError(#[from] PositiveRealError),
+    #[error("invalid format: expected HH:MM or HH:MM:SS")]
+    InvalidFormat,
 }
 
 /// Flight time, hrs
@@ -36,5 +39,32 @@ impl TryFrom<f32> for FlightTime {
     fn try_from(value: f32) -> Result<Self, Self::Error> {
         Self::validate_positive_real(value)?;
         Ok(Self(value))
+    }
+}
+
+impl FromStr for FlightTime {
+    type Err = FlightTimeError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.contains(':') {
+            let parts: Vec<&str> = s.split(':').collect();
+            let hours = match parts.as_slice() {
+                [h, m] => {
+                    let h = h.parse::<f32>().map_err(FlightTimeError::ParseError)?;
+                    let m = m.parse::<f32>().map_err(FlightTimeError::ParseError)?;
+                    h + m / 60.0
+                }
+                [h, m, s] => {
+                    let h = h.parse::<f32>().map_err(FlightTimeError::ParseError)?;
+                    let m = m.parse::<f32>().map_err(FlightTimeError::ParseError)?;
+                    let s = s.parse::<f32>().map_err(FlightTimeError::ParseError)?;
+                    h + m / 60.0 + s / 3600.0
+                }
+                _ => return Err(FlightTimeError::InvalidFormat),
+            };
+            return Self::try_from(hours).map_err(Into::into);
+        }
+        let value = s.parse::<f32>().map_err(FlightTimeError::ParseError)?;
+        Self::try_from(value).map_err(Into::into)
     }
 }
