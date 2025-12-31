@@ -1,0 +1,25 @@
+{
+    "name": "AM4Help",
+    "short_name": "AM4Help",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#383338",
+    "theme_color": "#383338",
+    "icons": [
+        {
+            "src": "assets/img/logo-32.webp",
+            "sizes": "32x32",
+            "type": "image/webp"
+        },
+        {
+            "src": "assets/img/logo-64.webp",
+            "sizes": "64x64",
+            "type": "image/webp"
+        },
+        {
+            "src": "assets/img/logo-500.webp",
+            "sizes": "500x500",
+            "type": "image/webp"
+        }
+    ]
+}

@@ -8,10 +8,19 @@
     <link data-trunk rel="rust" data-wasm-opt="s" data-reference-types="true" />
     <link data-trunk rel="scss" href="src/app.module.scss" />
     <link data-trunk rel="copy-dir" href="../am4/assets" />
+    <link data-trunk rel="copy-file" href="manifest.json" />
+    <link data-trunk rel="copy-file" href="sw.js" />
     <link rel="icon" href="assets/img/logo-32.webp" sizes="32x32" />
     <link rel="icon" href="assets/img/logo-128.webp" sizes="128x128" />
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <script>0</script>
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#383338" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js')
+                .catch(e => console.error('sw registration failed', e));
+        }
+    </script>
 </head>
 
 <body>

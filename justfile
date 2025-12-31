@@ -41,7 +41,10 @@ prepare-data:
 start-web:
     cd am4-web && trunk serve --release --minify
 
-build-web:
+gen-pwa:
+    uv run misc/scripts/gen_pwa.py
+
+build-web: gen-pwa
     cd am4-web && trunk build --release --minify
 
 dump params='':

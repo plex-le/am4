@@ -1258,3 +1258,17 @@ select {
         background-color: var(--bg-card) !important;
     }
 }
+
+/* PWA: safe area insets for notches */
+#app {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+}
+
+@media (display-mode: standalone) {
+    header {
+        padding-top: max(env(safe-area-inset-top), .5rem);
+    }
+}
