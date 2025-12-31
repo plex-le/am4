@@ -2,6 +2,7 @@ pub mod aircraft;
 pub mod airport;
 pub mod console;
 pub mod help;
+pub mod icons;
 pub mod nav;
 pub mod route;
 pub mod search;

@@ -9,6 +9,7 @@ use components::aircraft::{ACDetails, ACSearch, ACSelection};
 use components::airport::{APDetails, APSearch};
 use components::console::ConsoleView;
 use components::help::Help;
+use components::icons::DownloadIcon;
 use components::nav::{Header, Page};
 use components::route::{RouteList, RouteOptions, RouteStats, WebScheduledRoute};
 use components::settings::SettingsPanel;
@@ -183,19 +184,7 @@ pub fn App() -> impl IntoView {
                                                             load_demands.dispatch(());
                                                         }
                                                     >
-                                                        <svg
-                                                            xmlns="http://www.w3.org/2000/svg"
-                                                            width="20"
-                                                            height="20"
-                                                            viewBox="0 0 24 24"
-                                                            fill="none"
-                                                            stroke="currentColor"
-                                                            stroke-width="2"
-                                                        >
-                                                            <path d="M12 15V3"></path>
-                                                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                                            <path d="m7 10 5 5 5-5"></path>
-                                                        </svg>
+                                                        <DownloadIcon />
                                                         {move || {
                                                             if loading_demands.get() {
                                                                 "Downloading..."

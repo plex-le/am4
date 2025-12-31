@@ -1,4 +1,5 @@
 use crate::components::format_thousands;
+use crate::components::icons::DownloadIcon;
 use crate::db::Data;
 use am4::aircraft::custom::CustomAircraft;
 use am4::aircraft::AircraftType;
@@ -17,8 +18,12 @@ use am4::user::{AirportCodePref, GameMode, Settings};
 use am4::utils::Filter;
 use leptos::html::Select;
 use leptos::prelude::*;
+use leptos::wasm_bindgen::JsCast;
+use leptos::web_sys::js_sys;
+use std::fmt::Write;
 use std::num::NonZeroU8;
 use std::str::FromStr;
+use web_sys::{Blob, HtmlAnchorElement, Url};
 
 #[derive(Clone, Default, PartialEq, Copy)]
 pub struct RouteStats {
@@ -47,6 +52,134 @@ pub struct WebScheduledRoute {
     pub repair_cost: f32,
     pub profit: f32,
     pub demand: PaxDemand,
+}
+
+fn download_csv(routes: Vec<WebScheduledRoute>) {
+    if routes.is_empty() {
+        return;
+    }
+
+    let is_cargo = matches!(routes[0].config, ConfigVariant::Cargo(_));
+    let mut csv = String::with_capacity(routes.len() * 200);
+
+    csv.push_str(
+        "orig.id,orig.iata,orig.icao,\
+        dest.id,dest.name,dest.country,dest.iata,dest.icao,dest.lat,dest.lng,\
+        stop.id,stop.name,stop.country,stop.iata,stop.icao,stop.full_dist,",
+    );
+
+    if is_cargo {
+        csv.push_str("dem.l,dem.h,cfg.l,cfg.h,tkt.l,tkt.h,");
+    } else {
+        csv.push_str("dem.y,dem.j,dem.f,cfg.y,cfg.j,cfg.f,tkt.y,tkt.j,tkt.f,");
+    }
+
+    csv.push_str(
+        "direct_dist,time,trips_pd_pa,num_ac,income,fuel,co2,chk_cost,repair_cost,profit_pt,ci,contrib_pt\n",
+    );
+
+    let escape = |s: &str| -> String {
+        if s.contains(',') || s.contains('"') || s.contains('\n') {
+            format!("\"{}\"", s.replace('"', "\"\""))
+        } else {
+            s.to_string()
+        }
+    };
+
+    for r in routes {
+        let _ = write!(csv, "{},{},{},", r.origin.id, r.origin.iata, r.origin.icao);
+        let _ = write!(
+            csv,
+            "{},{},{},{},{},{:.6},{:.6},",
+            r.destination.id,
+            escape(&r.destination.name.to_string()),
+            escape(&r.destination.country),
+            r.destination.iata,
+            r.destination.icao,
+            r.destination.location.lat,
+            r.destination.location.lng
+        );
+
+        if let Some(stop) = r.stopover {
+            let _ = write!(
+                csv,
+                "{},{},{},{},{},{:.2},",
+                stop.id,
+                escape(&stop.name.to_string()),
+                escape(&stop.country),
+                stop.iata,
+                stop.icao,
+                r.total_distance.get()
+            );
+        } else {
+            csv.push_str(",,,,,,");
+        }
+
+        if is_cargo {
+            let dem: CargoDemand = (&r.demand).into();
+            let cfg = match r.config {
+                ConfigVariant::Cargo(c) => c,
+                _ => unreachable!(),
+            };
+            let tkt = match r.ticket {
+                Ticket::Cargo(t) => t,
+                _ => unreachable!(),
+            };
+            let _ = write!(
+                csv,
+                "{},{},{},{},{:.2},{:.2},",
+                dem.l, dem.h, cfg.l, cfg.h, tkt.l, tkt.h
+            );
+        } else {
+            let dem = r.demand;
+            let cfg = match r.config {
+                ConfigVariant::Pax(c) => c,
+                _ => unreachable!(),
+            };
+            let (ty, tj, tf) = match r.ticket {
+                Ticket::Pax(t) => (t.y, t.j, t.f),
+                Ticket::VIP(t) => (t.y, t.j, t.f),
+                _ => unreachable!(),
+            };
+            let _ = write!(
+                csv,
+                "{},{},{},{},{},{},{},{},{},",
+                dem.y, dem.j, dem.f, cfg.y, cfg.j, cfg.f, ty, tj, tf
+            );
+        }
+
+        let _ = writeln!(
+            csv,
+            "{:.2},{:.4},{},{},{:.0},{:.2},{:.2},{:.2},{:.2},{:.0},{},{:.2}",
+            r.direct_distance.get(),
+            r.flight_time.get(),
+            r.trips_per_day,
+            r.num_aircraft,
+            r.revenue,
+            r.fuel,
+            r.co2,
+            r.acheck_cost,
+            r.repair_cost,
+            r.profit,
+            r.ci.get(),
+            r.contribution
+        );
+    }
+
+    let blob = Blob::new_with_str_sequence(&js_sys::Array::of1(&csv.into())).expect("blob");
+    let url = Url::create_object_url_with_blob(&blob).expect("url");
+    let window = web_sys::window().expect("window");
+    let doc = window.document().expect("document");
+    let a = doc
+        .create_element("a")
+        .expect("element")
+        .dyn_into::<HtmlAnchorElement>()
+        .expect("anchor");
+
+    a.set_href(&url);
+    a.set_download("routes.csv");
+    a.click();
+    Url::revoke_object_url(&url).ok();
 }
 
 #[component]
@@ -578,6 +711,16 @@ pub fn RouteList(
                     {move || format!("~{:.1}", stats.get().time_ms)} "ms"
                 </span>
                 <div class="pagination">
+                    <button
+                        class="download"
+                        title="Download CSV"
+                        on:click=move |_| {
+                            download_csv(routes.get());
+                        }
+                    >
+                        <DownloadIcon size=16 />
+                        "CSV"
+                    </button>
                     <button
                         disabled=move || page.get() == 0
                         on:click=move |_| page.update(|p| *p -= 1)

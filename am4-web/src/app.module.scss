@@ -1005,6 +1005,12 @@ body {
                                     border-color: var(--accent);
                                 }
                             }
+
+                            button.download {
+                                padding: 0 8px;
+                                gap: 4px;
+                                width: fit-content;
+                            }
                         }
                     }
 
