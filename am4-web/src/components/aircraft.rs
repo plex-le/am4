@@ -36,9 +36,9 @@ impl ACSelection {
 
     pub fn to_custom(&self) -> Option<CustomAircraft> {
         match self {
-            Self::Single(a, m) | Self::Variant(a, m) => Some(
-                CustomAircraft::from_aircraft_and_modifiers(a.clone(), m.clone()),
-            ),
+            Self::Single(a, m) | Self::Variant(a, m) => {
+                Some(CustomAircraft::new(a.clone(), m.clone()))
+            }
             Self::Header(_) => None,
         }
     }
@@ -145,10 +145,10 @@ pub fn ACSearch(
             let ename = &ac.ename;
             let prio = ac.priority;
 
-            let modified = CustomAircraft::from_aircraft_and_modifiers(ac.clone(), mods.clone());
-            let speed = modified.aircraft.speed as u32;
-            let fuel = modified.aircraft.fuel;
-            let co2 = modified.aircraft.co2;
+            let modified = CustomAircraft::new(ac.clone(), mods.clone()).effective();
+            let speed = modified.speed as u32;
+            let fuel = modified.fuel;
+            let co2 = modified.co2;
 
             let make_btn = |m: Modifier, label: &'static str| {
                 let is_active = active_mods.contains(&m);
@@ -411,8 +411,8 @@ pub fn ACDetails() -> impl IntoView {
                 .map(|sel| {
                     let ac = sel.aircraft().clone();
                     let mods = sel.modification().cloned().unwrap_or_default();
-                    let custom = CustomAircraft::from_aircraft_and_modifiers(ac, mods);
-                    view! { <Ac aircraft=custom.aircraft /> }
+                    let custom = CustomAircraft::new(ac, mods);
+                    view! { <Ac aircraft=custom.effective() /> }
                 })
         }}
     }

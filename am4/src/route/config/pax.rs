@@ -21,6 +21,10 @@ pub enum PaxConfigAlgorithm {
     Jyf,
     Yfj,
     Yjf,
+    YOnly,
+    JOnly,
+    FOnly,
+    Spread,
 }
 
 impl std::fmt::Display for PaxConfigAlgorithm {
@@ -33,6 +37,10 @@ impl std::fmt::Display for PaxConfigAlgorithm {
             Self::Jyf => write!(f, "jyf"),
             Self::Yfj => write!(f, "yfj"),
             Self::Yjf => write!(f, "yjf"),
+            Self::YOnly => write!(f, "y"),
+            Self::JOnly => write!(f, "j"),
+            Self::FOnly => write!(f, "f"),
+            Self::Spread => write!(f, "spread"),
         }
     }
 }
@@ -49,6 +57,10 @@ impl std::str::FromStr for PaxConfigAlgorithm {
             "jyf" => Ok(Self::Jyf),
             "yfj" => Ok(Self::Yfj),
             "yjf" => Ok(Self::Yjf),
+            "y" => Ok(Self::YOnly),
+            "j" => Ok(Self::JOnly),
+            "f" => Ok(Self::FOnly),
+            "spread" => Ok(Self::Spread),
             _ => Err(()),
         }
     }
@@ -95,6 +107,10 @@ impl PaxConfig {
             PaxConfigAlgorithm::Jyf => Self::from_jyf(d_pf, capacity),
             PaxConfigAlgorithm::Yfj => Self::from_yfj(d_pf, capacity),
             PaxConfigAlgorithm::Yjf => Self::from_yjf(d_pf, capacity),
+            PaxConfigAlgorithm::YOnly => Self::from_y_only(d_pf, capacity),
+            PaxConfigAlgorithm::JOnly => Self::from_j_only(d_pf, capacity),
+            PaxConfigAlgorithm::FOnly => Self::from_f_only(d_pf, capacity),
+            PaxConfigAlgorithm::Spread => Self::from_spread(d_pf, capacity),
         }
     }
 
@@ -204,5 +220,49 @@ impl PaxConfig {
         } else {
             None
         }
+    }
+
+    fn from_y_only(d_pf: PaxDemand, capacity: u16) -> Option<Self> {
+        if capacity < d_pf.y {
+            Some(PaxConfig {
+                y: capacity,
+                j: 0,
+                f: 0,
+            })
+        } else {
+            None
+        }
+    }
+
+    fn from_j_only(d_pf: PaxDemand, capacity: u16) -> Option<Self> {
+        let j = capacity / 2;
+        if j < d_pf.j {
+            Some(PaxConfig { y: 0, j, f: 0 })
+        } else {
+            None
+        }
+    }
+
+    fn from_f_only(d_pf: PaxDemand, capacity: u16) -> Option<Self> {
+        let f = capacity / 3;
+        if f < d_pf.f {
+            Some(PaxConfig { y: 0, j: 0, f })
+        } else {
+            None
+        }
+    }
+
+    fn from_spread(d_pf: PaxDemand, capacity: u16) -> Option<Self> {
+        let eq_demand = d_pf.equivalent() as f32;
+        if eq_demand <= capacity as f32 {
+            return None;
+        }
+
+        let k = capacity as f32 / eq_demand;
+        let y = (d_pf.y as f32 * k).floor() as u16;
+        let j = (d_pf.j as f32 * k).floor() as u16;
+        let f = (d_pf.f as f32 * k).floor() as u16;
+
+        Some(PaxConfig { y, j, f })
     }
 }

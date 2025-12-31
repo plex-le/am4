@@ -185,10 +185,7 @@ impl Aircrafts {
         let engines = self.search_by_ctx(&ctx)?;
 
         if let Some(i) = engines.get(&ctx.modifiers.engine) {
-            Ok(CustomAircraft::from_aircraft_and_modifiers(
-                self.data[*i].clone(),
-                ctx.modifiers,
-            ))
+            Ok(CustomAircraft::new(self.data[*i].clone(), ctx.modifiers))
         } else {
             // we got the suggestions for free, so we might as well return in the error
             Err(AircraftSearchError::EnginePriorityNotFound {

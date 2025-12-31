@@ -95,10 +95,10 @@ fn test_aircraft_modifiers_syntax(
 
 #[rstest]
 fn test_aircraft_engine_modifier() {
-    let a = AIRCRAFTS.search("b744").unwrap().aircraft;
-    let a0 = AIRCRAFTS.search("b744[0]").unwrap().aircraft;
-    let a1 = AIRCRAFTS.search("b744[1]").unwrap().aircraft;
-    let a1sfc = AIRCRAFTS.search("b744[1,sfc]").unwrap().aircraft;
+    let a = AIRCRAFTS.search("b744").unwrap().effective();
+    let a0 = AIRCRAFTS.search("b744[0]").unwrap().effective();
+    let a1 = AIRCRAFTS.search("b744[1]").unwrap().effective();
+    let a1sfc = AIRCRAFTS.search("b744[1,sfc]").unwrap().effective();
 
     assert_eq!(a.id, a0.id);
     assert_eq!(a0.id, a1.id);
@@ -122,8 +122,8 @@ fn test_aircraft_engine_modifier() {
 
 #[rstest]
 fn test_aircraft_fourx() {
-    let a0 = AIRCRAFTS.search("b744").unwrap().aircraft;
-    let a1 = AIRCRAFTS.search("b744[x]").unwrap().aircraft;
+    let a0 = AIRCRAFTS.search("b744").unwrap().effective();
+    let a1 = AIRCRAFTS.search("b744[x]").unwrap().effective();
 
     assert!(
         (a1.speed / a0.speed - 4.0).abs() < 0.001,

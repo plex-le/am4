@@ -3,11 +3,13 @@ use crate::aircraft::{Aircraft, AircraftError};
 use std::collections::HashSet;
 use std::str::FromStr;
 
-/// An [aircraft][Aircraft] that is modified from the base model, for example,
-/// by upgrading the engine or changing the game mode.
+/// An container holding the base [Aircraft] and its [Modification]s.
+///
+/// To get the aircraft with modifiers applied (e.g. modified speed, fuel, cost),
+/// use [CustomAircraft::effective].
 #[derive(Debug, Clone, PartialEq)]
 pub struct CustomAircraft {
-    pub aircraft: Aircraft, // owned for now
+    pub aircraft: Aircraft,
     pub modifiers: Modification,
 }
 
@@ -28,20 +30,25 @@ pub enum Modifier {
 }
 
 impl CustomAircraft {
-    pub fn from_aircraft_and_modifiers(aircraft: Aircraft, modifiers: Modification) -> Self {
-        let mut ac = aircraft;
+    /// Create a new `CustomAircraft` from a base aircraft and modifiers.
+    pub fn new(aircraft: Aircraft, modifiers: Modification) -> Self {
+        Self {
+            aircraft,
+            modifiers,
+        }
+    }
+
+    /// Apply the modifiers to the base aircraft and return the result.
+    pub fn effective(&self) -> Aircraft {
+        let mut ac = self.aircraft.clone();
         let mut cost_mul = 1.0;
 
-        for modifier in modifiers.mods.iter() {
+        for modifier in self.modifiers.mods.iter() {
             modifier.apply(&mut ac);
             cost_mul *= modifier.cost_multiplier();
         }
         ac.cost = (ac.cost as f32 * cost_mul).ceil() as u32;
-
-        Self {
-            aircraft: ac,
-            modifiers,
-        }
+        ac
     }
 }
 

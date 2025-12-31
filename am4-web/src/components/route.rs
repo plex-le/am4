@@ -165,19 +165,24 @@ fn ConfigAlgoInput(
                                     <option value="jyf">"J>Y>F"</option>
                                     <option value="yfj">"Y>F>J"</option>
                                     <option value="yjf">"Y>J>F"</option>
+                                    <option value="y">"Y Only"</option>
+                                    <option value="j">"J Only"</option>
+                                    <option value="f">"F Only"</option>
                                 }
                                     .into_any()
                             }
                             AircraftType::Cargo => {
                                 view! {
-                                    <option value="l">"L>H"</option>
-                                    <option value="h">"H>L"</option>
+                                    <option value="lh">"L>H"</option>
+                                    <option value="hl">"H>L"</option>
+                                    <option value="l">"L Only"</option>
+                                    <option value="h">"H Only"</option>
                                 }
                                     .into_any()
                             }
                         })
                 }}
-
+                <option value="spread">"Spread"</option>
             </select>
         </label>
     }
@@ -259,7 +264,8 @@ pub fn RouteOptions(
             return;
         }
 
-        let custom_ac = ac_sel[0].clone();
+        // Apply modifications
+        let custom_ac = ac_sel[0].effective();
 
         let parse_range = |min: String, max: String, error_sig: &WriteSignal<Option<String>>| {
             let parse_val = |s: &str| -> Result<Option<f32>, String> {
@@ -410,7 +416,7 @@ pub fn RouteOptions(
                         data.airports.data(),
                     );
 
-                    let concrete = abstract_routes.with_aircraft(&custom_ac.aircraft, &gm);
+                    let concrete = abstract_routes.with_aircraft(&custom_ac, &gm);
                     let scheduled = concrete.schedule(demands, &data.distances, &search_config);
 
                     for r in scheduled.routes() {
