@@ -135,7 +135,7 @@ impl<'a> AbstractRoute<'a> {
     }
 
     fn distance_valid(&self, aircraft: &Aircraft) -> bool {
-        self.direct_distance.get() < aircraft.range as f32 * 2.0
+        self.direct_distance.get() < aircraft.range as f32
     }
 }
 

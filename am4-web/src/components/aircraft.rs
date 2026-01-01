@@ -4,7 +4,7 @@ use crate::db::Data;
 use am4::aircraft::custom::{CustomAircraft, Modification, Modifier};
 use am4::aircraft::db::{LENGTH_MAX, LENGTH_MEAN};
 use am4::aircraft::Aircraft;
-use am4::user::Settings;
+use am4::user::{GameMode, Settings};
 use leptos::prelude::*;
 
 #[derive(Clone, PartialEq)]
@@ -426,6 +426,7 @@ fn Ac(aircraft: Aircraft) -> impl IntoView {
     } else {
         aircraft.length as f32 / LENGTH_MAX
     } * 250f32;
+    let game_mode = expect_context::<RwSignal<GameMode>>();
 
     view! {
         <div class="ac-card">
@@ -471,7 +472,12 @@ fn Ac(aircraft: Aircraft) -> impl IntoView {
                 </tr>
                 <tr>
                     <th>{"Check cost"}</th>
-                    <td>"$ " {format_thousands(aircraft.check_cost)}</td>
+                    <td>
+                        "$ "
+                        {format_thousands(
+                            aircraft.check_cost as f32 * game_mode.get().acheck_cost_multiplier(),
+                        )}
+                    </td>
                 </tr>
                 <tr>
                     <th>{"Maintenance"}</th>

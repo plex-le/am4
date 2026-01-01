@@ -116,10 +116,10 @@ impl GameMode {
         }
     }
 
-    pub const fn cost_multiplier(&self) -> f32 {
+    pub const fn acheck_cost_multiplier(&self) -> f32 {
         match self {
-            Self::Easy => 0.5,
-            Self::Realism => 1.0,
+            Self::Easy => 1.0,
+            Self::Realism => 2.0,
         }
     }
 

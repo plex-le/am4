@@ -78,7 +78,7 @@ pub fn acheck_cost(
     flight_time: FlightTime,
     game_mode: GameMode,
 ) -> f32 {
-    let mode_mult = game_mode.cost_multiplier();
+    let mode_mult = game_mode.acheck_cost_multiplier();
     let speed_mult = game_mode.speed_multiplier();
 
     (ac_check_cost as f32 * mode_mult) * (flight_time.get() * speed_mult).ceil() / ac_maint as f32

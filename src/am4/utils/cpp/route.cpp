@@ -318,7 +318,7 @@ AircraftRoute AircraftRoute::create(
         }
     }
     acr.fuel = AircraftRoute::calc_fuel(ac, full_distance, user, acr.ci);
-    acr.acheck_cost = static_cast<float>(ac.check_cost * (user.game_mode == User::GameMode::EASY ? 0.5 : 1.0)) *
+    acr.acheck_cost = static_cast<float>(ac.check_cost * (user.game_mode == User::GameMode::EASY ? 1.0 : 2.0)) *
                       ceil(acr.flight_time * game_mode_speed_multiplier) / static_cast<float>(ac.maint);
     acr.repair_cost =
         ac.cost / 1000.0 * 0.0075 *

@@ -797,7 +797,7 @@ $$
 y_l + 2 j_l + 3 f_l &\text{if pax} \\
 \frac{1}{0.7}l_l + h_l &\text{if cargo}
 \end{cases}}{\text{capacity}} \\
-\mathrm{xp} &= \frac{\mathrm{round}(a\text{LF} + b d \text{LF}, 5)}{2l + 1}
+\mathrm{xp} &= \frac{\mathrm{round}(\text{LF}(a + b d)}, 5)}{2l + 1}
 \end{align*}
 $$
 
@@ -819,18 +819,3 @@ where:
 
 !!! note
     these values are approximate (fitted from data) and will expand as more data comes in.
-
-
-### Level Bar
-
-Found: Mar 4 2020 (Cathay Express)
-
-Confidence: <span class="c-good">100%</span> ($R^2 = 1$). Applicable for both <span class="easy">easy</span> and <span class="realism">realism</span>.
-
-
-$$f_{l + 1} = 8l + 4$$
-
-where:
-
-- $f_{l+1}$: number of flights needed to reach the next level
-- $l$: current level number
