@@ -133,10 +133,6 @@ impl<'a> AbstractRoute<'a> {
             GameMode::Realism => self.destination.rwy >= aircraft.rwy,
         }
     }
-
-    fn distance_valid(&self, aircraft: &Aircraft) -> bool {
-        self.direct_distance.get() < aircraft.range as f32
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -179,8 +175,9 @@ impl<'a> AbstractRoutes<'a> {
         aircraft: &'a Aircraft,
         game_mode: &'a GameMode,
     ) -> ConcreteRoutes<'a> {
+        let range_limit = aircraft.range as f32 * 2.0;
         self.routes.retain(|route| {
-            if !route.distance_valid(aircraft) {
+            if route.direct_distance.get() > range_limit {
                 self.errors.push(FailedRoute {
                     destination: route.destination,
                     error: RouteError::DistanceAboveRange,

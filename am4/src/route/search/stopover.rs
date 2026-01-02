@@ -44,6 +44,7 @@ impl<'a> Stopover<'a> {
         } else {
             0
         };
+        let range = aircraft.range as f32;
 
         for candidate in airports.iter() {
             if !Self::is_candidate_valid(candidate, origin, destination, rwy_req) {
@@ -53,14 +54,14 @@ impl<'a> Stopover<'a> {
             let Ok(inbound) = AbstractRoute::new(distances, origin, candidate) else {
                 continue;
             };
-            if !inbound.distance_valid(aircraft) {
+            if inbound.direct_distance.get() > range {
                 continue;
             }
 
             let Ok(outbound) = AbstractRoute::new(distances, destination, candidate) else {
                 continue;
             };
-            if !outbound.distance_valid(aircraft) {
+            if outbound.direct_distance.get() > range {
                 continue;
             }
 
@@ -92,6 +93,7 @@ impl<'a> Stopover<'a> {
         } else {
             0
         };
+        let range = aircraft.range as f32;
 
         for candidate in airports.iter() {
             if !Self::is_candidate_valid(candidate, origin, destination, rwy_req) {
@@ -101,14 +103,14 @@ impl<'a> Stopover<'a> {
             let Ok(inbound) = AbstractRoute::new(distances, origin, candidate) else {
                 continue;
             };
-            if !inbound.distance_valid(aircraft) {
+            if inbound.direct_distance.get() > range {
                 continue;
             }
 
             let Ok(outbound) = AbstractRoute::new(distances, destination, candidate) else {
                 continue;
             };
-            if !outbound.distance_valid(aircraft) {
+            if outbound.direct_distance.get() > range {
                 continue;
             }
 

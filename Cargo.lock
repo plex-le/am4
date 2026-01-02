@@ -83,7 +83,7 @@ checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 
 [[package]]
 name = "am4"
-version = "0.2.0+alpha.10"
+version = "0.2.0+alpha.11"
 dependencies = [
  "derive_more",
  "jaro_winkler",
@@ -104,7 +104,7 @@ dependencies = [
 
 [[package]]
 name = "am4-web"
-version = "0.2.0+alpha.10"
+version = "0.2.0+alpha.11"
 dependencies = [
  "am4",
  "console_error_panic_hook",
