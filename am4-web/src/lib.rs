@@ -153,14 +153,14 @@ pub fn App() -> impl IntoView {
                 </Show>
 
                 <Show when=move || page.get() == Page::Calculator>
+                    <ConsoleView />
+                    <SettingsPanel />
                     <Show
                         when=move || progress.get() == LoadDbProgress::Loaded
                         fallback=|| {
                             view! { <div class="padded">"Loading data..."</div> }
                         }
                     >
-                        <ConsoleView />
-                        <SettingsPanel />
                         <div id="search-layout">
                             <div id="input-group">
                                 <ACSearch selected=ac_selected active=ac_active />
