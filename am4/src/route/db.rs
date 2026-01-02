@@ -88,6 +88,7 @@ impl<const N: usize> Iterator for StrictlyUpperTriangularMatrix<N> {
 }
 
 /// Panics if `oidx == didx` (underflow)
+#[inline(always)]
 fn get_index(oidx: usize, didx: usize) -> usize {
     let (i, j) = if oidx > didx {
         (didx, oidx)
@@ -95,6 +96,25 @@ fn get_index(oidx: usize, didx: usize) -> usize {
         (oidx, didx)
     };
     StrictlyUpperTriangularMatrix::<AIRPORT_COUNT>::index((i, j))
+}
+
+/// Computes the index without any runtime checks.
+///
+/// # Safety
+/// - `oidx` and `didx` must both be `< AIRPORT_COUNT`
+/// - `oidx != didx`
+#[inline(always)]
+fn get_index_unchecked(oidx: usize, didx: usize) -> usize {
+    debug_assert!(oidx < AIRPORT_COUNT, "oidx out of bounds");
+    debug_assert!(didx < AIRPORT_COUNT, "didx out of bounds");
+    debug_assert_ne!(oidx, didx, "oidx == didx");
+
+    let (i, j) = if oidx > didx {
+        (didx, oidx)
+    } else {
+        (oidx, didx)
+    };
+    i * (2 * AIRPORT_COUNT - i - 1) / 2 + (j - i - 1)
 }
 
 #[derive(Debug)]
@@ -129,6 +149,17 @@ impl Index<(usize, usize)> for DemandMatrix {
     /// Panics if `oidx == didx` (underflow)
     fn index(&self, (oidx, didx): (usize, usize)) -> &Self::Output {
         &self.0[get_index(oidx, didx)]
+    }
+}
+
+impl DemandMatrix {
+    /// Get demand without bounds checking.
+    #[inline(always)]
+    pub fn get_unchecked(&self, oidx: usize, didx: usize) -> PaxDemand {
+        // SAFETY: Airport.idx values are guaranteed to be valid indices in [0, AIRPORT_COUNT)
+        // by the database construction in `Airports::from_bytes` which assigns idx sequentially.
+        // The `get_index_unchecked` function has debug asserts.
+        unsafe { *self.0.get_unchecked(get_index_unchecked(oidx, didx)) }
     }
 }
 
@@ -179,5 +210,16 @@ impl Index<(usize, usize)> for DistanceMatrix {
     /// Panics if `oidx == didx` (underflow)
     fn index(&self, (oidx, didx): (usize, usize)) -> &Self::Output {
         &self.0[get_index(oidx, didx)]
+    }
+}
+
+impl DistanceMatrix {
+    /// Get distance without bounds checking.
+    #[inline(always)]
+    pub fn get_unchecked(&self, oidx: usize, didx: usize) -> Distance {
+        // SAFETY: Airport.idx values are guaranteed to be valid indices in [0, AIRPORT_COUNT)
+        // by the database construction in `Airports::from_bytes` which assigns idx sequentially.
+        // The `get_index_unchecked` function has debug asserts.
+        unsafe { *self.0.get_unchecked(get_index_unchecked(oidx, didx)) }
     }
 }

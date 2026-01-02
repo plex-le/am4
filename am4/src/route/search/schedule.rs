@@ -232,7 +232,7 @@ impl<'a> ConcreteRoutes<'a> {
             let repair = metrics::repair_cost(ac.cost, settings.training.repair);
             let fuel = metrics::fuel(ac.fuel, total_distance, settings.training.fuel, ci);
 
-            let demand = demand_matrix[(self.config.origin.idx, route.destination.idx)];
+            let demand = demand_matrix.get_unchecked(self.config.origin.idx, route.destination.idx);
             let res = solve_schedule(
                 ac,
                 demand,
