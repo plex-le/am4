@@ -4,13 +4,15 @@ mod utils;
 
 use am4::{AC_FILENAME, AP_FILENAME, DEM_FILENAME0, DEM_FILENAME1};
 use polars::frame::row::Row;
-use polars::io::prelude::*;
 use polars::prelude::*;
 
 use std::io::Write;
 use std::path::Path;
 use std::str::FromStr;
 use utils::*;
+
+const DB_DATA_DIR: &str = "../../../am4-private/community/db-data/";
+const DOCS_DIR: &str = "../../docs/assets/";
 
 fn convert_routes(out_dir: &Path) {
     use am4::route::demand::PaxDemand;
@@ -24,23 +26,21 @@ fn convert_routes(out_dir: &Path) {
     schema.with_column("d".into(), DataType::Float64);
     schema.with_column("rwy".into(), DataType::UInt16);
 
-    let lf = LazyCsvReader::new(PlPath::from_str(
-        "../../../am4-private/community/db-data/routes.csv",
-    ))
-    .with_has_header(false)
-    .with_schema(Some(Arc::new(schema)))
-    .finish()
-    .unwrap();
+    let lf = LazyCsvReader::new(PlPath::from_string(format!("{DB_DATA_DIR}/routes.csv")))
+        .with_has_header(false)
+        .with_schema(Some(Arc::new(schema)))
+        .finish()
+        .unwrap();
 
     // v0.1
-    let mut df = lf
-        .clone()
-        .select([col("yd"), col("jd"), col("fd"), col("d")])
-        .collect()
-        .unwrap();
-    let mut file = std::fs::File::create("routes.parquet").unwrap();
-    ParquetWriter::new(&mut file).finish(&mut df).unwrap();
-    dbg!(df);
+    // let mut df = lf
+    //     .clone()
+    //     .select([col("yd"), col("jd"), col("fd"), col("d")])
+    //     .collect()
+    //     .unwrap();
+    // let mut file = std::fs::File::create("routes.parquet").unwrap();
+    // ParquetWriter::new(&mut file).finish(&mut df).unwrap();
+    // dbg!(df);
 
     // v0.2
     let df = &lf
@@ -102,13 +102,13 @@ fn convert_airports(out_dir: &Path) {
     schema.with_column("hub_cost".into(), DataType::UInt32);
     schema.with_column("rwy_codes".into(), DataType::String);
 
-    let lf = LazyCsvReader::new(PlPath::from_str(
-        "../../../am4-private/community/db-data/airports.csv",
-    ))
-    .with_has_header(true)
-    .with_schema(Some(Arc::new(schema)))
-    .finish()
-    .unwrap();
+    let path_airport_csv = format!("{DB_DATA_DIR}/airports.csv");
+    std::fs::copy(&path_airport_csv, format!("{DOCS_DIR}/airports.csv")).unwrap();
+    let lf = LazyCsvReader::new(PlPath::from_string(format!("{DB_DATA_DIR}/airports.csv")))
+        .with_has_header(true)
+        .with_schema(Some(Arc::new(schema)))
+        .finish()
+        .unwrap();
 
     let df = &lf.collect().unwrap();
     // v0.1
@@ -188,13 +188,13 @@ fn convert_aircrafts(out_dir: &Path) {
     schema.with_column("wingspan".into(), DataType::UInt8);
     schema.with_column("length".into(), DataType::UInt8);
 
-    let lf = LazyCsvReader::new(PlPath::from_str(
-        "../../../am4-private/community/db-data/aircrafts.csv",
-    ))
-    .with_has_header(true)
-    .with_schema(Some(Arc::new(schema)))
-    .finish()
-    .unwrap();
+    let path_aircraft_csv = format!("{DB_DATA_DIR}/aircrafts.csv");
+    std::fs::copy(&path_aircraft_csv, format!("{DOCS_DIR}/aircrafts.csv")).unwrap();
+    let lf = LazyCsvReader::new(PlPath::from_string(format!("{DB_DATA_DIR}/aircrafts.csv")))
+        .with_has_header(true)
+        .with_schema(Some(Arc::new(schema)))
+        .finish()
+        .unwrap();
     let df = &lf.collect().unwrap();
 
     // v0.1

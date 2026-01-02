@@ -19,11 +19,11 @@ An aircraft is associated with many attributes. Among the most important are:
 
 <sup>†</sup> A common question is the discrepancy between aircraft specifications in the menu page and the detailed order page. The menu page lists the *base* specifications - clicking into the detailed order page applies a multiplier (typically 0.95-1.05) to the base specifications.
 
-The list of aircrafts can be downloaded [here](https://github.com/abc8747/am4/releases/download/v0.1.10/aircrafts.parquet).
+The list of aircraft can be downloaded [here](assets/aircrafts.csv).
 
 ## Airport
 
-The list of airports can be downloaded [here](https://github.com/abc8747/am4/releases/download/v0.1.10/airports.parquet).
+The list of airports can be downloaded [here](assets/airports.csv).
 
 ## Routing
 

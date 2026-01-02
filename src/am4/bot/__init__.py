@@ -9,6 +9,7 @@ from loguru import logger
 import am4
 from am4.utils import __version__ as am4utils_version
 
+from ..common import DOCS_URL
 from ..config import cfg
 from .channels import channels
 from .cogs.aircraft import AircraftCog
@@ -59,7 +60,7 @@ async def on_guild_join(guild: discord.Guild):
             name="Contribute",
             value=(
                 "[Source code](https://github.com/abc8747/am4), "
-                "[list of formulae and documentation](https://abc8747.github.io/am4) "
+                f"[list of formulae and documentation]({DOCS_URL}) "
                 "is open-source on GitHub. Feel free to open an issue or pull request!"
             ),
             inline=False,

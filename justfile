@@ -1,13 +1,13 @@
 fmt:
-    uv run --python 3.9 ruff check src
-    uv run --python 3.9 ruff format --check src
+    uv run ruff check src
+    uv run ruff format --check src
     cargo fmt --all
     cargo clippy --all-targets --fix --allow-dirty --allow-staged --all-features
     leptosfmt am4-web/**/*.rs
 
 check:
-    uv run --python 3.9 ruff check src --fix
-    uv run --python 3.9 ruff format src
+    uv run ruff check src --fix
+    uv run ruff format src
     cargo fmt --all --check
     cargo clippy --workspace --all-targets --all-features -- -D warnings
 
@@ -36,7 +36,7 @@ build-docs:
     RUSTDOCFLAGS="-D rustdoc::all -A rustdoc::private-doc-tests" cargo doc --package am4 --all-features --no-deps
 
 prepare-data:
-    cd scripts/prepare_data/ && cargo run
+    cd scripts/prepare_data/ && cargo run --release
 
 start-web:
     cd am4-web && trunk serve --release --minify

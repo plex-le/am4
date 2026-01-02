@@ -3,13 +3,12 @@ import io
 from typing import Annotated, Callable
 
 import discord
-from discord.ext import commands
-from pydantic_core import PydanticCustomError, ValidationError
-from rich.console import Console
-
 from am4.utils.aircraft import Aircraft
 from am4.utils.airport import Airport
 from am4.utils.db.utils import jaro_winkler_distance
+from discord.ext import commands
+from pydantic_core import PydanticCustomError, ValidationError
+from rich.console import Console
 
 from ..config import cfg
 from .channels import channels

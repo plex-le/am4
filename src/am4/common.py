@@ -55,3 +55,5 @@ _HELP_LOAD = (
 )
 HELP_U_LOAD = f"**Assumed aircraft load** (default: `0.99`)\n\n{_HELP_LOAD}"
 HELP_U_CARGO_LOAD = f"**Assumed cargo aircraft load** (default: `0.99`)\n\n{_HELP_LOAD}"
+
+DOCS_URL = "https://abc8747.github.io/am4"

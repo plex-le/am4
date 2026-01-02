@@ -60,7 +60,7 @@ plugins:
       handlers:
         python:
           paths: [src/am4/utils/stubs, src/am4]
-          import:
+          inventories:
             - https://docs.python.org/3/objects.inv
             - https://discordpy.readthedocs.io/en/latest/objects.inv
             # - https://docs.pydantic.dev/objects.inv
