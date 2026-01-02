@@ -33,7 +33,7 @@ class HelpCog(BaseCog):
             ),
             inline=False,
         )
-        embed.set_thumbnail(url="https://am4help.com/assets/img/logo.png")
+        embed.set_thumbnail(url="https://am4help.com/assets/img/icons/logo-512.png")
         await ctx.send(embed=embed, allowed_mentions=AllowedMentions.none())
 
     @staticmethod

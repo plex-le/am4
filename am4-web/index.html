@@ -6,23 +6,33 @@
     <meta charset="UTF-8">
     <meta name="description" content="Tools and utilities for the game Airline Manager 4.">
 
-    <!-- ensure we get quick html updates -->
+    <!-- aggressively check for updates -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
 
-    <link data-trunk rel="rust" data-wasm-opt="s" data-reference-types="true" />
+    <link data-trunk rel="rust" data-wasm-opt="s" data-reference-types="true"
+        data-cargo-profile-release="wasm-release" />
     <link data-trunk rel="scss" href="src/app.module.scss" />
     <link data-trunk rel="copy-dir" href="../am4/assets" />
     <link data-trunk rel="copy-file" href="manifest.json" />
     <link data-trunk rel="copy-file" href="sw.js" />
-    <link rel="icon" href="assets/img/logo-32.webp" sizes="32x32" />
-    <link rel="icon" href="assets/img/logo-64.webp" sizes="64x64" />
-    <link rel="icon" href="assets/img/logo-500.webp" sizes="500x500" />
+    <link rel="icon" href="assets/img/icons/logo-32.png" sizes="32x32" />
+    <link rel="icon" href="assets/img/icons/logo-196.png" sizes="196x196" />
+    <link rel="icon" href="assets/img/icons/logo-512.png" sizes="512x512" />
+    <link rel="apple-touch-icon" href="assets/img/icons/logo-196.png">
     <link rel="manifest" href="manifest.json" />
     <meta name="theme-color" content="#383338" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <script>
+        const isIos = () => {
+            const userAgent = window.navigator.userAgent.toLowerCase();
+            return /iphone|ipad|ipod/.test(userAgent);
+        }
+        const isInStandaloneMode = () => ('standalone' in window.navigator) && (window.navigator.standalone);
+        if (isIos() && !isInStandaloneMode()) {
+            this.setState({ showInstallMessage: true });
+        }
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/sw.js')
                 .catch(e => console.error('sw registration failed', e));

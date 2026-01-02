@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-am4 = { path = "../../../am4" }
+am4 = { path = "../../am4" }
 image = "0.25.1"
 polars = { version = "0.52.0", features = [
     "lazy",
@@ -14,7 +14,7 @@ polars = { version = "0.52.0", features = [
     "timezones",
     "csv",
 ] }
-reqwest = { version = "0.12.5", features = ["blocking"] }
+reqwest = { version = "0.13", features = ["blocking"] }
 rkyv = "0.8.12"
 thiserror = "2"
 webp = "0.3.0"

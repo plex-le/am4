@@ -4,6 +4,4 @@ src/am4/utils/cpp/include/ext/** linguist-vendored
 src/am4/utils/_official_api/** linguist-vendored
 src/am4/db/pb_migrations/** linguist-vendored
 src/am4/db/pb_data/** linguist-vendored
-misc/demand-research/** linguist-vendored
-misc/scripts/** linguist-vendored
-*.pyx linguist-language=Cython
+scripts/** linguist-vendored

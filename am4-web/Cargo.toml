@@ -33,3 +33,11 @@ features = [
 
 [package.metadata.leptos]
 lib-profile-release = "wasm-release"
+
+[package.metadata.trunk.watch]
+ignore = ["./sw.js"]
+
+[[package.metadata.trunk.hooks]]
+stage = "build"
+command = "uv"
+command_arguments = ["run", "../scripts/generate_pwa_sw.py"]

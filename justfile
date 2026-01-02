@@ -36,15 +36,12 @@ build-docs:
     RUSTDOCFLAGS="-D rustdoc::all -A rustdoc::private-doc-tests" cargo doc --package am4 --all-features --no-deps
 
 prepare-data:
-    cd misc/scripts/prepare_data/ && cargo run
+    cd scripts/prepare_data/ && cargo run
 
 start-web:
     cd am4-web && trunk serve --release --minify
 
-gen-pwa:
-    uv run misc/scripts/gen_pwa.py
-
-build-web: gen-pwa
+build-web:
     cd am4-web && trunk build --release --minify
 
 dump params='':

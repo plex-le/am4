@@ -29,7 +29,7 @@ pub fn Header() -> impl IntoView {
         <header>
             <div id="global-nav">
                 <a href="https://github.com/abc8747/am4" target="_blank">
-                    <img src="/assets/img/logo-64.webp" alt="logo" height="32" width="32" />
+                    <img src="/assets/img/icons/logo-196.png" alt="logo" height="32" width="32" />
                 </a>
                 <div>
                     <span id="name">"AM4Help"</span>

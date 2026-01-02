@@ -64,7 +64,7 @@ async def on_guild_join(guild: discord.Guild):
             ),
             inline=False,
         )
-        embed.set_thumbnail(url="https://am4help.com/assets/img/logo.png")
+        embed.set_thumbnail(url="https://am4help.com/assets/img/icons/logo-512.png")
         await channel.send(embed=embed)
 
 

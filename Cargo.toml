@@ -1,12 +1,11 @@
 [workspace]
 resolver = "2"
-members = ["am4", "am4-app", "am4-web", "misc/scripts/prepare_data"]
-
-[profile.release]
-debug = true
+members = ["am4", "am4-app", "am4-web", "scripts/prepare_data"]
 
 [profile.wasm-release]
 inherits = "release"
 opt-level = 's'
 lto = true
 codegen-units = 1
+panic = "abort"
+# strip = true  # https://github.com/llvm/llvm-project/issues/64909
