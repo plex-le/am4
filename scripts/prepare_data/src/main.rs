@@ -198,10 +198,10 @@ fn convert_aircrafts(out_dir: &Path) {
     let df = &lf.collect().unwrap();
 
     // v0.1
-    // let mut file = std::fs::File::create("aircrafts.parquet").unwrap();
-    // ParquetWriter::new(&mut file)
-    //     .finish(&mut df.clone())
-    //     .unwrap();
+    let mut file = std::fs::File::create("aircrafts.parquet").unwrap();
+    ParquetWriter::new(&mut file)
+        .finish(&mut df.clone())
+        .unwrap();
 
     let web_images = ac_image::process(df.column("img").unwrap().as_materialized_series(), out_dir);
 
@@ -258,7 +258,7 @@ fn convert_aircrafts(out_dir: &Path) {
 }
 
 fn main() {
-    let out_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../am4/assets");
+    let out_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../am4/assets");
     std::fs::create_dir_all(&out_dir).unwrap();
 
     convert_routes(&out_dir);

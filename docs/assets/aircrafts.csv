@@ -496,5 +496,7 @@ id,shortname,manufacturer,name,type,priority,eid,ename,speed,fuel,co2,cost,capac
 380,c17a,Boeing,C-17A,1,0,36,PW4094,888,13.2,0.2,51114635,200000,3500,250000,4480,35000,400,2,2,1,1,assets/img/aircraft/png/globemaster.png,0,0
 381,c130,Lockheed,C-130,0,0,345,Allison 501-D22A,541,18,0.21,2105020,92,1200,150000,3800,33000,400,2,3,1,1,assets/img/aircraft/png/c130.png,18,20
 382,a350f,Airbus,A350F,1,0,46,RR Trent XWB,860,15.98,0.21,60500000,245000,8760,1954321,9250,40000,350,2,2,3,4,assets/img/aircraft/png/350f.png,0,0
-383,ccxvip,Cessna,Citation X-VIP,2,0,121,RR/Allison AE 3007C1,1002.87,6.44,0.08,583993,12,4000,20559,8600,40000,1500,2,1,1,2,assets/img/aircraft/png/citationx_vip.png,22,19
-384,ch604vip,Bombardier,Challenger 604-VIP,2,0,166,GE CF-34-3B,846,3.68,0.05,860590,12,3780,12705,10701,40000,2000,2,1,1,1,assets/img/aircraft/png/challenger300_vip.png,21,20
+383,ch605vip,Bombardier,Challenger 605-VIP,2,0,0,(unspecified),900,4,0.05,860590,12,3780,12705,10701,40000,2000,2,1,1,1,assets/img/aircraft/png/challenger300_vip.png,21,20
+383,ch605vip,Bombardier,Challenger 605-VIP,2,1,166,GE CF-34-3B,846,3.68,0.05,860590,12,3780,12705,10701,40000,2000,2,1,1,1,assets/img/aircraft/png/challenger300_vip.png,21,20
+384,ccxvip,Cessna,Citation X-VIP,2,0,0,(unspecified),1013,7,0.08,583993,12,4000,20559,8600,40000,1500,2,1,1,2,assets/img/aircraft/png/citationx_vip.png,22,19
+384,ccxvip,Cessna,Citation X-VIP,2,1,121,RR/Allison AE 3007C1,1002.87,6.44,0.08,583993,12,4000,20559,8600,40000,1500,2,1,1,2,assets/img/aircraft/png/citationx_vip.png,22,19
