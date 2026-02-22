@@ -43,7 +43,7 @@ pub struct User {
 }
 
 #[derive(Debug, Clone, Default)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(default))]
 pub struct Settings {
     pub training: Training,
     pub fuel_price: FuelPrice,
@@ -58,6 +58,15 @@ pub struct Settings {
     pub default_co2_mod: bool,
     pub airport_code_pref: AirportCodePref,
     pub allow_invalid_tpd: bool,
+    pub csv_time_format: CsvTimeFormat,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum CsvTimeFormat {
+    #[default]
+    HhMmSs,
+    Decimal,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]

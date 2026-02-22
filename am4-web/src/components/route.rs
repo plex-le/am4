@@ -1,3 +1,6 @@
+use crate::components::airport::APSearch;
+use crate::components::format_flight_time_csv;
+use crate::components::format_flight_time_hms;
 use crate::components::format_thousands;
 use crate::components::icons::DownloadIcon;
 use crate::db::Data;
@@ -7,6 +10,7 @@ use am4::airport::Airport;
 use am4::route::config::ConfigAlgorithm;
 use am4::route::demand::{CargoDemand, PaxDemand};
 use am4::route::metrics::ConfigVariant;
+use am4::route::search::ferry::FerryRoutes;
 use am4::route::search::schedule::{
     CiStrategy, NumAircraftStrategy, ScheduleStrategy, SearchConfig, SortBy, TripsPerDay,
     TripsPerDayStrategy,
@@ -14,7 +18,7 @@ use am4::route::search::schedule::{
 use am4::route::search::AbstractRoutes;
 use am4::route::ticket::Ticket;
 use am4::route::{Ci, Distance, FlightTime};
-use am4::user::{AirportCodePref, GameMode, Settings};
+use am4::user::{AirportCodePref, CsvTimeFormat, GameMode, Settings};
 use am4::utils::Filter;
 use leptos::html::Select;
 use leptos::prelude::*;
@@ -29,6 +33,14 @@ use web_sys::{Blob, HtmlAnchorElement, Url};
 pub struct RouteStats {
     pub count: usize,
     pub time_ms: f64,
+}
+
+#[derive(Clone, Copy, Default, PartialEq, Eq)]
+pub enum SearchMode {
+    #[default]
+    AnyDestination,
+    SpecificDestination,
+    Sell,
 }
 
 #[derive(Clone, PartialEq)]
@@ -54,7 +66,90 @@ pub struct WebScheduledRoute {
     pub demand: PaxDemand,
 }
 
-fn download_csv(routes: Vec<WebScheduledRoute>) {
+#[derive(Clone, PartialEq)]
+pub struct WebFerryRoute {
+    pub origin: Airport,
+    pub destination: Airport,
+    pub direct_distance: Distance,
+    pub flight_time: FlightTime,
+    pub fuel: f32,
+    pub sale_price: f32,
+    pub profit: f32,
+}
+
+#[derive(Clone, PartialEq)]
+pub enum WebRoute {
+    Scheduled(WebScheduledRoute),
+    Ferry(WebFerryRoute),
+}
+
+impl WebRoute {
+    fn profit(&self) -> f32 {
+        match self {
+            Self::Scheduled(r) => r.profit,
+            Self::Ferry(r) => r.profit,
+        }
+    }
+
+    fn trips_per_day(&self) -> u8 {
+        match self {
+            Self::Scheduled(r) => r.trips_per_day,
+            Self::Ferry(_) => 1,
+        }
+    }
+
+    fn profit_per_day(&self) -> f32 {
+        self.profit() * self.trips_per_day() as f32
+    }
+}
+
+fn trigger_file_download(csv_content: &str, filename: &str) {
+    let blob = Blob::new_with_str_sequence(&js_sys::Array::of1(&csv_content.into())).expect("blob");
+    let url = Url::create_object_url_with_blob(&blob).expect("url");
+    let window = web_sys::window().expect("window");
+    let doc = window.document().expect("document");
+    let a = doc
+        .create_element("a")
+        .expect("element")
+        .dyn_into::<HtmlAnchorElement>()
+        .expect("anchor");
+
+    a.set_href(&url);
+    a.set_download(filename);
+    a.click();
+    Url::revoke_object_url(&url).ok();
+}
+
+fn download_csv(routes: Vec<WebRoute>, csv_time_format: CsvTimeFormat) {
+    if routes.is_empty() {
+        return;
+    }
+
+    match &routes[0] {
+        WebRoute::Scheduled(_) => {
+            let scheduled = routes
+                .into_iter()
+                .filter_map(|r| match r {
+                    WebRoute::Scheduled(s) => Some(s),
+                    WebRoute::Ferry(_) => None,
+                })
+                .collect();
+            download_scheduled_csv(scheduled, csv_time_format);
+        }
+        WebRoute::Ferry(_) => {
+            let ferry = routes
+                .into_iter()
+                .filter_map(|r| match r {
+                    WebRoute::Scheduled(_) => None,
+                    WebRoute::Ferry(f) => Some(f),
+                })
+                .collect();
+            download_ferry_csv(ferry, csv_time_format);
+        }
+    }
+}
+
+fn download_scheduled_csv(routes: Vec<WebScheduledRoute>, csv_time_format: CsvTimeFormat) {
     if routes.is_empty() {
         return;
     }
@@ -150,9 +245,9 @@ fn download_csv(routes: Vec<WebScheduledRoute>) {
 
         let _ = writeln!(
             csv,
-            "{:.2},{:.4},{},{},{:.0},{:.2},{:.2},{:.2},{:.2},{:.0},{},{:.2}",
+            "{:.2},{},{},{},{:.0},{:.2},{:.2},{:.2},{:.2},{:.0},{},{:.2}",
             r.direct_distance.get(),
-            r.flight_time.get(),
+            format_flight_time_csv(r.flight_time, csv_time_format),
             r.trips_per_day,
             r.num_aircraft,
             r.revenue,
@@ -166,20 +261,48 @@ fn download_csv(routes: Vec<WebScheduledRoute>) {
         );
     }
 
-    let blob = Blob::new_with_str_sequence(&js_sys::Array::of1(&csv.into())).expect("blob");
-    let url = Url::create_object_url_with_blob(&blob).expect("url");
-    let window = web_sys::window().expect("window");
-    let doc = window.document().expect("document");
-    let a = doc
-        .create_element("a")
-        .expect("element")
-        .dyn_into::<HtmlAnchorElement>()
-        .expect("anchor");
+    trigger_file_download(&csv, "routes.csv");
+}
 
-    a.set_href(&url);
-    a.set_download("routes.csv");
-    a.click();
-    Url::revoke_object_url(&url).ok();
+fn download_ferry_csv(routes: Vec<WebFerryRoute>, csv_time_format: CsvTimeFormat) {
+    if routes.is_empty() {
+        return;
+    }
+
+    let mut csv = String::with_capacity(routes.len() * 120);
+    csv.push_str(
+        "orig.id,orig.iata,orig.icao,dest.id,dest.name,dest.country,dest.iata,dest.icao,direct_dist,time,fuel,sale_price,profit\n",
+    );
+
+    let escape = |s: &str| -> String {
+        if s.contains(',') || s.contains('"') || s.contains('\n') {
+            format!("\"{}\"", s.replace('"', "\"\""))
+        } else {
+            s.to_string()
+        }
+    };
+
+    for r in routes {
+        let _ = writeln!(
+            csv,
+            "{},{},{},{},{},{},{},{},{:.2},{},{:.2},{:.2},{:.2}",
+            r.origin.id,
+            r.origin.iata,
+            r.origin.icao,
+            r.destination.id,
+            escape(&r.destination.name.to_string()),
+            escape(&r.destination.country),
+            r.destination.iata,
+            r.destination.icao,
+            r.direct_distance.get(),
+            format_flight_time_csv(r.flight_time, csv_time_format),
+            r.fuel,
+            r.sale_price,
+            r.profit
+        );
+    }
+
+    trigger_file_download(&csv, "ferry-routes.csv");
 }
 
 #[component]
@@ -322,11 +445,332 @@ fn ConfigAlgoInput(
     }
 }
 
+#[derive(Default)]
+struct InputErrors {
+    dist: Option<String>,
+    ft: Option<String>,
+    num_ac: Option<String>,
+    tpd: Option<String>,
+    ci: Option<String>,
+}
+
+struct ParsedSearchInputs {
+    distance_filter: Filter<Distance>,
+    flight_time_filter: Filter<FlightTime>,
+    schedule: ScheduleStrategy,
+    ci: CiStrategy,
+    sort_by: SortBy,
+    inflate_distance_with_stopover: bool,
+    config: ConfigAlgorithm,
+}
+
+fn parse_range_values(
+    min: &str,
+    max: &str,
+    parser: &dyn Fn(&str) -> Result<f32, String>,
+) -> Result<(Option<f32>, Option<f32>), String> {
+    let parse_val = |s: &str| -> Result<Option<f32>, String> {
+        if s.trim().is_empty() {
+            return Ok(None);
+        }
+        parser(s).map(Some)
+    };
+
+    let min_res = parse_val(min)?;
+    let max_res = parse_val(max)?;
+
+    if let (Some(min), Some(max)) = (min_res, max_res) {
+        if min < 0. || max < 0. {
+            return Err("Must be positive".into());
+        }
+        if min > max {
+            return Err("Min > Max".into());
+        }
+    }
+
+    Ok((min_res, max_res))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn parse_search_inputs(
+    mode: SearchMode,
+    d_min: &str,
+    d_max: &str,
+    f_min: &str,
+    f_max: &str,
+    n_ac: &str,
+    n_ac_is_max: bool,
+    tpd: &str,
+    tpd_is_max: bool,
+    ci_s: &str,
+    ci_is_auto: bool,
+    stopover: bool,
+    sort_by: SortBy,
+    config: ConfigAlgorithm,
+    show_distance_filters: bool,
+    show_num_ac: bool,
+    show_tpd: bool,
+    show_ci: bool,
+) -> (Option<ParsedSearchInputs>, InputErrors) {
+    let mut errors = InputErrors::default();
+
+    let dist_parser = |s: &str| s.parse::<f32>().map_err(|_| "Invalid number".to_string());
+    let ft_parser = |s: &str| {
+        FlightTime::from_str(s)
+            .map(|ft| ft.get())
+            .map_err(|_| "Invalid format".to_string())
+    };
+
+    let distance_filter = if show_distance_filters {
+        match parse_range_values(d_min, d_max, &dist_parser) {
+            Ok((l, r)) => match (l, r) {
+                (Some(min), Some(max)) => {
+                    Filter::Range(Distance::new_unchecked(min)..Distance::new_unchecked(max))
+                }
+                (Some(min), None) => Filter::RangeFrom(Distance::new_unchecked(min)..),
+                (None, Some(max)) => Filter::RangeTo(..Distance::new_unchecked(max)),
+                (None, None) => Filter::RangeFull,
+            },
+            Err(e) => {
+                errors.dist = Some(e);
+                Filter::RangeFull
+            }
+        }
+    } else {
+        Filter::RangeFull
+    };
+
+    let ft_max_specified = show_distance_filters && !f_max.trim().is_empty();
+    let flight_time_filter = if show_distance_filters {
+        match parse_range_values(f_min, f_max, &ft_parser) {
+            Ok((l, r)) => match (l, r) {
+                (Some(min), Some(max)) => {
+                    Filter::Range(FlightTime::new_unchecked(min)..FlightTime::new_unchecked(max))
+                }
+                (Some(min), None) => Filter::RangeFrom(FlightTime::new_unchecked(min)..),
+                (None, Some(max)) => Filter::RangeTo(..FlightTime::new_unchecked(max)),
+                (None, None) => Filter::RangeFull,
+            },
+            Err(e) => {
+                errors.ft = Some(e);
+                Filter::RangeFull
+            }
+        }
+    } else {
+        Filter::RangeFull
+    };
+
+    let num_aircraft = if show_num_ac {
+        if n_ac_is_max {
+            NumAircraftStrategy::Maximise
+        } else if n_ac.trim().is_empty() {
+            errors.num_ac = Some("Required".into());
+            NumAircraftStrategy::Strict(NonZeroU8::new(1).unwrap())
+        } else {
+            match n_ac.parse::<u8>().ok().and_then(NonZeroU8::new) {
+                Some(n) => NumAircraftStrategy::Strict(n),
+                None => {
+                    errors.num_ac = Some("Must be > 0".into());
+                    NumAircraftStrategy::Strict(NonZeroU8::new(1).unwrap())
+                }
+            }
+        }
+    } else {
+        NumAircraftStrategy::Strict(NonZeroU8::new(1).unwrap())
+    };
+
+    let trips_per_day = if show_tpd {
+        if tpd_is_max {
+            TripsPerDayStrategy::Maximise
+        } else if tpd.trim().is_empty() {
+            errors.tpd = Some("Required".into());
+            TripsPerDayStrategy::Strict(TripsPerDay::new(1).unwrap())
+        } else {
+            match tpd.parse::<u8>().ok().and_then(TripsPerDay::new) {
+                Some(t) => TripsPerDayStrategy::Strict(t),
+                None => {
+                    errors.tpd = Some("Must be > 0".into());
+                    TripsPerDayStrategy::Strict(TripsPerDay::new(1).unwrap())
+                }
+            }
+        }
+    } else {
+        TripsPerDayStrategy::Strict(TripsPerDay::new(1).unwrap())
+    };
+
+    let ci = if show_ci {
+        if ci_is_auto && ft_max_specified {
+            CiStrategy::AlignConstraint
+        } else if ci_s.trim().is_empty() {
+            errors.ci = Some("Required".into());
+            CiStrategy::Strict(Ci::MAX)
+        } else {
+            match ci_s.parse::<u8>().ok().and_then(|v| Ci::new(v).ok()) {
+                Some(c) => CiStrategy::Strict(c),
+                None => {
+                    errors.ci = Some("0-200".into());
+                    CiStrategy::Strict(Ci::MAX)
+                }
+            }
+        }
+    } else {
+        CiStrategy::Strict(Ci::MAX)
+    };
+
+    if errors.dist.is_some()
+        || errors.ft.is_some()
+        || errors.num_ac.is_some()
+        || errors.tpd.is_some()
+        || errors.ci.is_some()
+    {
+        return (None, errors);
+    }
+
+    (
+        Some(ParsedSearchInputs {
+            distance_filter,
+            flight_time_filter,
+            schedule: ScheduleStrategy {
+                trips_per_day,
+                num_aircraft,
+            },
+            ci,
+            sort_by,
+            inflate_distance_with_stopover: mode == SearchMode::AnyDestination && stopover,
+            config,
+        }),
+        errors,
+    )
+}
+
+fn execute_sell_mode(
+    data: &Data,
+    ap_sel: &[Airport],
+    custom_ac: &am4::aircraft::Aircraft,
+    user_settings: &Settings,
+    gm: &GameMode,
+    parsed: &ParsedSearchInputs,
+) -> Vec<WebRoute> {
+    let mut all_results = Vec::new();
+
+    for origin in ap_sel {
+        let abstract_routes = AbstractRoutes::new(
+            &data.airports,
+            &data.distances,
+            origin,
+            data.airports.data(),
+        );
+        let concrete = abstract_routes.with_aircraft(custom_ac, gm);
+        let ferry_routes =
+            FerryRoutes::new(concrete.routes().to_vec(), custom_ac, user_settings, *gm);
+
+        for r in ferry_routes.routes() {
+            if !parsed.distance_filter.contains(&r.direct_distance)
+                || !parsed.flight_time_filter.contains(&r.flight_time)
+            {
+                continue;
+            }
+
+            all_results.push(WebRoute::Ferry(WebFerryRoute {
+                origin: origin.clone(),
+                destination: r.destination.clone(),
+                direct_distance: r.direct_distance,
+                flight_time: r.flight_time,
+                fuel: r.fuel,
+                sale_price: r.sale_price,
+                profit: r.profit,
+            }));
+        }
+    }
+
+    all_results.sort_by(|a, b| b.profit().partial_cmp(&a.profit()).unwrap());
+    all_results
+}
+
+fn execute_scheduled_mode(
+    data: &Data,
+    ap_sel: &[Airport],
+    ap_dest: &[Airport],
+    mode: SearchMode,
+    custom_ac: &am4::aircraft::Aircraft,
+    user_settings: &Settings,
+    gm: &GameMode,
+    parsed: &ParsedSearchInputs,
+) -> Option<Vec<WebRoute>> {
+    let demands = data.demands.as_ref()?;
+    let search_config = SearchConfig {
+        user_settings,
+        distance_filter: parsed.distance_filter.clone(),
+        flight_time_filter: parsed.flight_time_filter.clone(),
+        schedule: parsed.schedule.clone(),
+        ci: parsed.ci.clone(),
+        sort_by: parsed.sort_by.clone(),
+        inflate_distance_with_stopover: parsed.inflate_distance_with_stopover,
+        config: parsed.config,
+    };
+
+    let mut all_results = Vec::new();
+
+    for origin in ap_sel {
+        let destinations = if mode == SearchMode::SpecificDestination {
+            ap_dest
+        } else {
+            data.airports.data()
+        };
+
+        let abstract_routes =
+            AbstractRoutes::new(&data.airports, &data.distances, origin, destinations);
+        let concrete = abstract_routes.with_aircraft(custom_ac, gm);
+        let scheduled = concrete.schedule(demands, &data.distances, &search_config);
+
+        for r in scheduled.routes() {
+            all_results.push(WebRoute::Scheduled(WebScheduledRoute {
+                origin: origin.clone(),
+                destination: r.destination.clone(),
+                stopover: r.stopover.as_ref().map(|s| s.0.clone()),
+                direct_distance: r.direct_distance,
+                total_distance: r.total_distance,
+                flight_time: r.flight_time,
+                ci: r.ci,
+                contribution: r.contribution,
+                trips_per_day: r.trips_per_day.get(),
+                num_aircraft: r.num_aircraft.get(),
+                config: r.config,
+                ticket: r.ticket,
+                revenue: r.revenue,
+                fuel: r.fuel,
+                co2: r.co2,
+                acheck_cost: r.acheck_cost,
+                repair_cost: r.repair_cost,
+                profit: r.profit,
+                demand: demands[(origin.idx, r.destination.idx)],
+            }));
+        }
+    }
+
+    if mode == SearchMode::AnyDestination {
+        match parsed.sort_by {
+            SortBy::ProfitPerTrip => {
+                all_results.sort_by(|a, b| b.profit().partial_cmp(&a.profit()).unwrap());
+            }
+            SortBy::ProfitPerAcPerDay => {
+                all_results
+                    .sort_by(|a, b| b.profit_per_day().partial_cmp(&a.profit_per_day()).unwrap());
+            }
+        }
+    }
+
+    Some(all_results)
+}
+
 #[component]
 pub fn RouteOptions(
     #[prop(into)] ac_selected: RwSignal<Vec<CustomAircraft>>,
     #[prop(into)] ap_selected: RwSignal<Vec<Airport>>,
-    #[prop(into)] set_routes: WriteSignal<Vec<WebScheduledRoute>>,
+    #[prop(into)] ap_destination: RwSignal<Vec<Airport>>,
+    #[prop(into)] ap_destination_active: RwSignal<Option<Airport>>,
+    #[prop(into)] search_mode: RwSignal<SearchMode>,
+    #[prop(into)] set_routes: WriteSignal<Vec<WebRoute>>,
     #[prop(into)] set_stats: WriteSignal<RouteStats>,
 ) -> impl IntoView {
     let database = expect_context::<StoredValue<Option<Data>>>();
@@ -359,6 +803,18 @@ pub fn RouteOptions(
     let config_algo = RwSignal::new(ConfigAlgorithm::Auto);
 
     let ac_type = Memo::new(move |_| ac_selected.get().first().map(|c| c.aircraft.r#type.clone()));
+    let show_destination_input =
+        Memo::new(move |_| search_mode.get() == SearchMode::SpecificDestination);
+    let show_distance_filters =
+        Memo::new(move |_| search_mode.get() != SearchMode::SpecificDestination);
+    let show_num_ac = Memo::new(move |_| search_mode.get() == SearchMode::AnyDestination);
+    let show_tpd = Memo::new(move |_| search_mode.get() != SearchMode::Sell);
+    let show_ci = Memo::new(move |_| search_mode.get() != SearchMode::Sell);
+    let can_execute = Memo::new(move |_| {
+        !ac_selected.get().is_empty()
+            && !ap_selected.get().is_empty()
+            && (!show_destination_input.get() || !ap_destination.get().is_empty())
+    });
 
     Effect::new(move |_| {
         let max = dist_max.get();
@@ -370,6 +826,8 @@ pub fn RouteOptions(
     Effect::new(move |_| {
         let ac_sel = ac_selected.get();
         let ap_sel = ap_selected.get();
+        let ap_dest = ap_destination.get();
+        let mode = search_mode.get();
         let user_settings = settings.get();
         let gm = game_mode.get();
         let sort = sort_by.get();
@@ -386,7 +844,7 @@ pub fn RouteOptions(
         let stopover = stopover_mode.get();
         let algo = config_algo.get();
 
-        if ac_sel.is_empty() || ap_sel.is_empty() {
+        if !can_execute.get() {
             set_routes.set(vec![]);
             set_stats.set(RouteStats::default());
             set_dist_error.set(None);
@@ -399,132 +857,35 @@ pub fn RouteOptions(
 
         let custom_ac = ac_sel[0].effective();
 
-        let parse_range = |min: String,
-                           max: String,
-                           error_sig: &WriteSignal<Option<String>>,
-                           parser: &dyn Fn(&str) -> Result<f32, String>| {
-            let parse_val = |s: &str| -> Result<Option<f32>, String> {
-                if s.trim().is_empty() {
-                    return Ok(None);
-                }
-                parser(s).map(Some)
-            };
+        let (parsed, errors) = parse_search_inputs(
+            mode,
+            &d_min,
+            &d_max,
+            &f_min,
+            &f_max,
+            &n_ac,
+            n_ac_is_max,
+            &tpd,
+            tpd_is_max,
+            &ci_s,
+            ci_is_auto,
+            stopover,
+            sort,
+            algo,
+            show_distance_filters.get(),
+            show_num_ac.get(),
+            show_tpd.get(),
+            show_ci.get(),
+        );
 
-            let min_res = parse_val(&min);
-            let max_res = parse_val(&max);
+        set_dist_error.set(errors.dist);
+        set_ft_error.set(errors.ft);
+        set_num_ac_error.set(errors.num_ac);
+        set_tpd_error.set(errors.tpd);
+        set_ci_error.set(errors.ci);
 
-            match (min_res, max_res) {
-                (Err(e), _) | (_, Err(e)) => {
-                    error_sig.set(Some(e));
-                    None
-                }
-                (Ok(l), Ok(r)) => {
-                    if let (Some(min), Some(max)) = (l, r) {
-                        if min < 0. || max < 0. {
-                            error_sig.set(Some("Must be positive".into()));
-                            return None;
-                        }
-                        if min > max {
-                            error_sig.set(Some("Min > Max".into()));
-                            return None;
-                        }
-                    }
-                    error_sig.set(None);
-                    Some((l, r))
-                }
-            }
-        };
-
-        let dist_parser = |s: &str| s.parse::<f32>().map_err(|_| "Invalid number".to_string());
-        let ft_parser = |s: &str| {
-            FlightTime::from_str(s)
-                .map(|ft| ft.get())
-                .map_err(|_| "Invalid format".to_string())
-        };
-
-        let dist_filter =
-            if let Some((l, r)) = parse_range(d_min, d_max, &set_dist_error, &dist_parser) {
-                match (l, r) {
-                    (Some(min), Some(max)) => {
-                        Filter::Range(Distance::new_unchecked(min)..Distance::new_unchecked(max))
-                    }
-                    (Some(min), None) => Filter::RangeFrom(Distance::new_unchecked(min)..),
-                    (None, Some(max)) => Filter::RangeTo(..Distance::new_unchecked(max)),
-                    (None, None) => Filter::RangeFull,
-                }
-            } else {
-                return;
-            };
-
-        let ft_max_specified = !f_max.trim().is_empty();
-        let ft_filter = if let Some((l, r)) = parse_range(f_min, f_max, &set_ft_error, &ft_parser) {
-            match (l, r) {
-                (Some(min), Some(max)) => {
-                    Filter::Range(FlightTime::new_unchecked(min)..FlightTime::new_unchecked(max))
-                }
-                (Some(min), None) => Filter::RangeFrom(FlightTime::new_unchecked(min)..),
-                (None, Some(max)) => Filter::RangeTo(..FlightTime::new_unchecked(max)),
-                (None, None) => Filter::RangeFull,
-            }
-        } else {
+        let Some(parsed) = parsed else {
             return;
-        };
-
-        let num_ac_strat = if n_ac_is_max {
-            set_num_ac_error.set(None);
-            NumAircraftStrategy::Maximise
-        } else if n_ac.trim().is_empty() {
-            set_num_ac_error.set(Some("Required".into()));
-            return;
-        } else {
-            match n_ac.parse::<u8>().ok().and_then(NonZeroU8::new) {
-                Some(n) => {
-                    set_num_ac_error.set(None);
-                    NumAircraftStrategy::Strict(n)
-                }
-                None => {
-                    set_num_ac_error.set(Some("Must be > 0".into()));
-                    return;
-                }
-            }
-        };
-
-        let tpd_strat = if tpd_is_max {
-            set_tpd_error.set(None);
-            TripsPerDayStrategy::Maximise
-        } else if tpd.trim().is_empty() {
-            set_tpd_error.set(Some("Required".into()));
-            return;
-        } else {
-            match tpd.parse::<u8>().ok().and_then(TripsPerDay::new) {
-                Some(t) => {
-                    set_tpd_error.set(None);
-                    TripsPerDayStrategy::Strict(t)
-                }
-                None => {
-                    set_tpd_error.set(Some("Must be > 0".into()));
-                    return;
-                }
-            }
-        };
-
-        let ci_strat = if ci_is_auto && ft_max_specified {
-            set_ci_error.set(None);
-            CiStrategy::AlignConstraint
-        } else if ci_s.trim().is_empty() {
-            set_ci_error.set(Some("Required".into()));
-            return;
-        } else {
-            match ci_s.parse::<u8>().ok().and_then(|v| Ci::new(v).ok()) {
-                Some(c) => {
-                    set_ci_error.set(None);
-                    CiStrategy::Strict(c)
-                }
-                None => {
-                    set_ci_error.set(Some("0-200".into()));
-                    return;
-                }
-            }
         };
 
         let performance = web_sys::window().unwrap().performance().unwrap();
@@ -532,146 +893,131 @@ pub fn RouteOptions(
 
         database.with_value(|db| {
             let data = db.as_ref().unwrap();
-            if let Some(demands) = &data.demands {
-                let search_config = SearchConfig {
-                    user_settings: &user_settings,
-                    distance_filter: dist_filter,
-                    flight_time_filter: ft_filter,
-                    schedule: ScheduleStrategy {
-                        trips_per_day: tpd_strat,
-                        num_aircraft: num_ac_strat,
-                    },
-                    ci: ci_strat,
-                    sort_by: sort.clone(),
-                    inflate_distance_with_stopover: stopover,
-                    config: algo,
-                };
-
-                let mut all_results = Vec::new();
-
-                for origin in ap_sel.iter() {
-                    let abstract_routes = AbstractRoutes::new(
-                        &data.airports,
-                        &data.distances,
-                        origin,
-                        data.airports.data(),
-                    );
-
-                    let concrete = abstract_routes.with_aircraft(&custom_ac, &gm);
-                    let scheduled = concrete.schedule(demands, &data.distances, &search_config);
-
-                    for r in scheduled.routes() {
-                        all_results.push(WebScheduledRoute {
-                            origin: origin.clone(),
-                            destination: r.destination.clone(),
-                            stopover: r.stopover.as_ref().map(|s| s.0.clone()),
-                            direct_distance: r.direct_distance,
-                            total_distance: r.total_distance,
-                            flight_time: r.flight_time,
-                            ci: r.ci,
-                            contribution: r.contribution,
-                            trips_per_day: r.trips_per_day.get(),
-                            num_aircraft: r.num_aircraft.get(),
-                            config: r.config,
-                            ticket: r.ticket,
-                            revenue: r.revenue,
-                            fuel: r.fuel,
-                            co2: r.co2,
-                            acheck_cost: r.acheck_cost,
-                            repair_cost: r.repair_cost,
-                            profit: r.profit,
-                            demand: demands[(origin.idx, r.destination.idx)],
-                        });
+            let results = match mode {
+                SearchMode::Sell => {
+                    execute_sell_mode(data, &ap_sel, &custom_ac, &user_settings, &gm, &parsed)
+                }
+                SearchMode::AnyDestination | SearchMode::SpecificDestination => {
+                    match execute_scheduled_mode(
+                        data,
+                        &ap_sel,
+                        &ap_dest,
+                        mode,
+                        &custom_ac,
+                        &user_settings,
+                        &gm,
+                        &parsed,
+                    ) {
+                        Some(v) => v,
+                        None => {
+                            set_routes.set(vec![]);
+                            set_stats.set(RouteStats::default());
+                            return;
+                        }
                     }
                 }
+            };
 
-                match sort {
-                    SortBy::ProfitPerTrip => {
-                        all_results.sort_by(|a, b| b.profit.partial_cmp(&a.profit).unwrap());
-                    }
-                    SortBy::ProfitPerAcPerDay => {
-                        all_results.sort_by(|a, b| {
-                            let pa = a.profit * a.trips_per_day as f32;
-                            let pb = b.profit * b.trips_per_day as f32;
-                            pb.partial_cmp(&pa).unwrap()
-                        });
-                    }
-                }
-
-                set_stats.set(RouteStats {
-                    count: all_results.len(),
-                    time_ms: performance.now() - start_time,
-                });
-                set_routes.set(all_results);
-            }
+            set_stats.set(RouteStats {
+                count: results.len(),
+                time_ms: performance.now() - start_time,
+            });
+            set_routes.set(results);
         });
     });
 
     view! {
         <div class="route-options">
-            <FilterInput label="Distance (km)" min_val=dist_min max_val=dist_max error=dist_error />
-            <FilterInput label="Time (hr)" min_val=ft_min max_val=ft_max error=ft_error />
-            <StrategyInput
-                label="AC per route"
-                value=num_ac_input
-                is_active=num_ac_max
-                active_label="Maximise"
-                error=num_ac_error
-            />
-            <StrategyInput
-                label="Trips per day per AC"
-                value=tpd_input
-                is_active=tpd_max
-                active_label="Maximise"
-                error=tpd_error
-            />
-            <StrategyInput
-                label="Cost Index"
-                value=ci_input
-                is_active=ci_auto
-                active_label="Align Max Time"
-                error=ci_error
-                disable_button=Signal::derive(move || { ft_max.get().trim().is_empty() })
-            />
-            <label class:disabled=move || {
-                dist_max.get().trim().is_empty()
-            }>
-                "Inflate distance"
-                <input
-                    type="checkbox"
-                    prop:checked=stopover_mode
-                    prop:disabled=move || dist_max.get().trim().is_empty()
-                    on:change=move |ev| stopover_mode.set(event_target_checked(&ev))
+            <Show when=move || show_destination_input.get()>
+                <APSearch selected=ap_destination active=ap_destination_active />
+            </Show>
+
+            <Show when=move || show_distance_filters.get()>
+                <FilterInput
+                    label="Distance (km)"
+                    min_val=dist_min
+                    max_val=dist_max
+                    error=dist_error
                 />
-            </label>
-            <ConfigAlgoInput algo=config_algo ac_type=ac_type />
-            <div class="toggle-group">
-                <span>"Sort"</span>
-                <div class="toggle-options">
-                    <button
-                        class:active=move || sort_by.get() == SortBy::ProfitPerAcPerDay
-                        on:click=move |_| sort_by.set(SortBy::ProfitPerAcPerDay)
-                    >
-                        "$/d/ac"
-                    </button>
-                    <button
-                        class:active=move || sort_by.get() == SortBy::ProfitPerTrip
-                        on:click=move |_| sort_by.set(SortBy::ProfitPerTrip)
-                    >
-                        "$/t"
-                    </button>
+                <FilterInput label="Time (hr)" min_val=ft_min max_val=ft_max error=ft_error />
+            </Show>
+
+            <Show when=move || show_num_ac.get()>
+                <StrategyInput
+                    label="AC per route"
+                    value=num_ac_input
+                    is_active=num_ac_max
+                    active_label="Maximise"
+                    error=num_ac_error
+                />
+            </Show>
+
+            <Show when=move || show_tpd.get()>
+                <StrategyInput
+                    label="Trips per day per AC"
+                    value=tpd_input
+                    is_active=tpd_max
+                    active_label="Maximise"
+                    error=tpd_error
+                />
+            </Show>
+
+            <Show when=move || show_ci.get()>
+                <StrategyInput
+                    label="Cost Index"
+                    value=ci_input
+                    is_active=ci_auto
+                    active_label="Align Max Time"
+                    error=ci_error
+                    disable_button=Signal::derive(move || {
+                        show_destination_input.get() || ft_max.get().trim().is_empty()
+                    })
+                />
+                <ConfigAlgoInput algo=config_algo ac_type=ac_type />
+            </Show>
+
+            <Show when=move || search_mode.get() == SearchMode::AnyDestination>
+                <label class:disabled=move || {
+                    dist_max.get().trim().is_empty()
+                }>
+                    "Inflate distance"
+                    <input
+                        type="checkbox"
+                        prop:checked=stopover_mode
+                        prop:disabled=move || dist_max.get().trim().is_empty()
+                        on:change=move |ev| stopover_mode.set(event_target_checked(&ev))
+                    />
+                </label>
+                <div class="toggle-group">
+                    <span>"Sort"</span>
+                    <div class="toggle-options">
+                        <button
+                            class:active=move || sort_by.get() == SortBy::ProfitPerAcPerDay
+                            on:click=move |_| sort_by.set(SortBy::ProfitPerAcPerDay)
+                        >
+                            "$/d/ac"
+                        </button>
+                        <button
+                            class:active=move || sort_by.get() == SortBy::ProfitPerTrip
+                            on:click=move |_| sort_by.set(SortBy::ProfitPerTrip)
+                        >
+                            "$/t"
+                        </button>
+                    </div>
                 </div>
-            </div>
+            </Show>
         </div>
     }
 }
 
 #[component]
 pub fn RouteList(
-    #[prop(into)] routes: ReadSignal<Vec<WebScheduledRoute>>,
+    #[prop(into)] routes: ReadSignal<Vec<WebRoute>>,
     #[prop(into)] stats: ReadSignal<RouteStats>,
     #[prop(into)] show_origin: Signal<bool>,
+    #[prop(into)] search_mode: Signal<SearchMode>,
 ) -> impl IntoView {
+    let settings = expect_context::<RwSignal<Settings>>();
     let page = RwSignal::new(0usize);
     let page_size = 10usize;
 
@@ -707,15 +1053,21 @@ pub fn RouteList(
         }>
             <div class="results-meta">
                 <span>
-                    {move || stats.get().count} " routes found in "
-                    {move || format!("~{:.1}", stats.get().time_ms)} "ms"
+                    {move || stats.get().count}
+                    {move || {
+                        if search_mode.get() == SearchMode::Sell {
+                            " ferry routes found in "
+                        } else {
+                            " routes found in "
+                        }
+                    }} {move || format!("~{:.1}", stats.get().time_ms)} "ms"
                 </span>
                 <div class="pagination">
                     <button
                         class="download"
                         title="Download CSV"
                         on:click=move |_| {
-                            download_csv(routes.get());
+                            download_csv(routes.get(), settings.get().csv_time_format);
                         }
                     >
                         <DownloadIcon size=16 />
@@ -767,7 +1119,14 @@ pub fn RouteList(
                 each=move || paged_results.get()
                 key=|_| uuid::Uuid::new_v4()
                 children=move |route| {
-                    view! { <RouteCard route=route show_origin=show_origin /> }
+                    match route {
+                        WebRoute::Scheduled(r) => {
+                            view! { <RouteCard route=r show_origin=show_origin /> }.into_any()
+                        }
+                        WebRoute::Ferry(r) => {
+                            view! { <FerryRouteCard route=r show_origin=show_origin /> }.into_any()
+                        }
+                    }
                 }
             />
         </div>
@@ -788,12 +1147,7 @@ pub fn RouteCard(route: WebScheduledRoute, show_origin: Signal<bool>) -> impl In
     let fmt_dist = |d: f32| format!("{} km", format_thousands(d));
 
     let is_cargo = matches!(route.config, ConfigVariant::Cargo(_));
-
-    let total_seconds = (route.flight_time.get() * 3600.0).round() as u64;
-    let h = total_seconds / 3600;
-    let m = (total_seconds % 3600) / 60;
-    let s = total_seconds % 60;
-    let ft_str = format!("{:02}:{:02}:{:02}", h, m, s);
+    let ft_str = format_flight_time_hms(route.flight_time);
 
     let dist_diff_pct = (route.total_distance.get() - route.direct_distance.get())
         / route.direct_distance.get()
@@ -1055,6 +1409,62 @@ pub fn RouteCard(route: WebScheduledRoute, show_origin: Signal<bool>) -> impl In
                     <span class="cost-value expense">{repair_cost_str}</span>
                 </div>
             </details>
+        </div>
+    }
+}
+
+#[component]
+pub fn FerryRouteCard(route: WebFerryRoute, show_origin: Signal<bool>) -> impl IntoView {
+    let settings = expect_context::<RwSignal<Settings>>();
+    let fmt_money = |v: f32| format!("$ {}", format_thousands(v));
+    let fmt_dist = |d: f32| format!("{} km", format_thousands(d));
+
+    let ft_str = format_flight_time_hms(route.flight_time);
+
+    let format_code = move |ap: &Airport| {
+        settings.with(|s| match s.airport_code_pref {
+            AirportCodePref::Iata => ap.iata.to_string(),
+            AirportCodePref::Icao => ap.icao.to_string(),
+        })
+    };
+
+    let origin_code = format_code(&route.origin);
+    let dest_code = format_code(&route.destination);
+
+    let fuel_price = settings.get().fuel_price.get();
+    let fuel_cost = route.fuel * fuel_price / 1000.0;
+
+    view! {
+        <div class="route-card">
+            <div class="header">
+                <Show when=move || show_origin.get()>
+                    <div class="dest-block">
+                        <span class="label">"from"</span>
+                        <div class="codes">
+                            <span class="main">{origin_code.clone()}</span>
+                        </div>
+                        <div class="name">
+                            {route.origin.name.to_string()} ", " {route.origin.country.to_string()}
+                        </div>
+                    </div>
+                </Show>
+                <div class="dest-block">
+                    <span class="label">"sell at"</span>
+                    <div class="codes">
+                        <span class="main">{dest_code}</span>
+                    </div>
+                    <div class="name">
+                        {route.destination.name.to_string()} ", "
+                        {route.destination.country.to_string()}
+                    </div>
+                </div>
+            </div>
+
+            <div class="details-text">
+                {fmt_dist(route.direct_distance.get())} " (" {ft_str} ")" " ⋅ Market: "
+                {route.destination.market} "%" <br /> "Fuel: " {fmt_money(fuel_cost)} " ("
+                {format_thousands(route.fuel)} " lbs)" " ⋅ Profit: " {fmt_money(route.profit)}
+            </div>
         </div>
     }
 }

@@ -322,34 +322,11 @@ pub fn ACSearch(
     let render_pill = move |sel: ACSelection, remove: Callback<()>| {
         let ac = sel.aircraft();
         let mods = sel.modification();
-        let mod_str = if let Some(m) = mods {
-            let mut s = String::new();
-            if m.mods.contains(&Modifier::Speed) {
-                s.push('s');
-            }
-            if m.mods.contains(&Modifier::Fuel) {
-                s.push('f');
-            }
-            if m.mods.contains(&Modifier::Co2) {
-                s.push('c');
-            }
-            if m.mods.contains(&Modifier::FourX) {
-                s.push('x');
-            }
-            s
-        } else {
-            String::new()
-        };
-
-        let prio = match mods {
-            Some(m) if m.engine.get() != 0 => m.engine.get().to_string(),
-            _ => String::new(),
-        };
-        let suffix = if !prio.is_empty() || !mod_str.is_empty() {
-            format!("[{}{}]", prio, mod_str)
-        } else {
-            String::new()
-        };
+        let suffix = mods
+            .map(ToString::to_string)
+            .filter(|s| !s.is_empty())
+            .map(|s| format!("[{s}]"))
+            .unwrap_or_default();
 
         view! {
             <div class="ac-pill">
@@ -383,6 +360,20 @@ pub fn ACSearch(
 
     let is_selectable = Callback::new(|item: ACSelection| !matches!(item, ACSelection::Header(_)));
 
+    let parse_token = Callback::new(move |token: String| {
+        database.with_value(|db| {
+            db.as_ref()
+                .and_then(|db| db.aircrafts.search(&token).ok())
+                .map(|ca| ACSelection::Single(ca.aircraft, ca.modifiers))
+        })
+    });
+
+    let serialize = Callback::new(|item: ACSelection| {
+        item.to_custom()
+            .map(|ca| ca.to_string())
+            .unwrap_or_default()
+    });
+
     view! {
         <div id="ac-search">
             <label>"Aircraft"</label>
@@ -394,6 +385,8 @@ pub fn ACSearch(
                 placeholder="Search aircraft..."
                 render_option=render_option
                 render_pill=render_pill
+                serialize=serialize
+                parse_token=parse_token
                 is_selectable=is_selectable
             />
         </div>

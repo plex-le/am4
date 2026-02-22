@@ -11,7 +11,7 @@ use components::console::ConsoleView;
 use components::help::Help;
 use components::icons::DownloadIcon;
 use components::nav::{Header, Page};
-use components::route::{RouteList, RouteOptions, RouteStats, WebScheduledRoute};
+use components::route::{RouteList, RouteOptions, RouteStats, SearchMode, WebRoute};
 use components::settings::SettingsPanel;
 
 use console::{ConsoleState, UserLogger};
@@ -73,13 +73,16 @@ pub fn App() -> impl IntoView {
 
     let ac_selected = RwSignal::new(Vec::<CustomAircraft>::new());
     let ap_selected = RwSignal::new(Vec::<Airport>::new());
+    let ap_destination = RwSignal::new(Vec::<Airport>::new());
     let ac_active = RwSignal::new(None::<ACSelection>);
     let ap_active = RwSignal::new(None::<Airport>);
+    let ap_destination_active = RwSignal::new(None::<Airport>);
+    let search_mode = RwSignal::new(SearchMode::AnyDestination);
 
     let demands_state = RwSignal::new(DemandsState::Unknown);
     let loading_demands = RwSignal::new(false);
 
-    let (routes, set_routes) = signal(Vec::<WebScheduledRoute>::new());
+    let (routes, set_routes) = signal(Vec::<WebRoute>::new());
     let (stats, set_stats) = signal(RouteStats::default());
     let show_origin = Memo::new(move |_| ap_selected.get().len() > 1);
 
@@ -116,6 +119,7 @@ pub fn App() -> impl IntoView {
     provide_context(page);
     provide_context(ac_active);
     provide_context(ap_active);
+    provide_context(ap_destination);
 
     LocalResource::new(move || async move {
         logger.info(format!(
@@ -164,7 +168,41 @@ pub fn App() -> impl IntoView {
                         <div id="search-layout">
                             <div id="input-group">
                                 <ACSearch selected=ac_selected active=ac_active />
-                                <APSearch selected=ap_selected active=ap_active />
+                                <APSearch selected=ap_selected active=ap_active label="Origin" />
+
+                                <div class="mode-toggle">
+                                    <span>"Destination"</span>
+                                    <div class="toggle-options">
+                                        <button
+                                            class:active=move || {
+                                                search_mode.get() == SearchMode::AnyDestination
+                                            }
+                                            on:click=move |_| {
+                                                search_mode.set(SearchMode::AnyDestination)
+                                            }
+                                        >
+                                            "Any"
+                                        </button>
+                                        <button
+                                            class:active=move || {
+                                                search_mode.get() == SearchMode::SpecificDestination
+                                            }
+                                            on:click=move |_| {
+                                                search_mode.set(SearchMode::SpecificDestination)
+                                            }
+                                        >
+                                            "Specific"
+                                        </button>
+                                        <button
+                                            class:active=move || {
+                                                search_mode.get() == SearchMode::Sell
+                                            }
+                                            on:click=move |_| search_mode.set(SearchMode::Sell)
+                                        >
+                                            "Sell"
+                                        </button>
+                                    </div>
+                                </div>
 
                                 <Show
                                     when=move || demands_state.get() == DemandsState::Present
@@ -202,6 +240,9 @@ pub fn App() -> impl IntoView {
                                     <RouteOptions
                                         ac_selected=ac_selected
                                         ap_selected=ap_selected
+                                        ap_destination=ap_destination
+                                        ap_destination_active=ap_destination_active
+                                        search_mode=search_mode
                                         set_routes=set_routes
                                         set_stats=set_stats
                                     />
@@ -210,7 +251,12 @@ pub fn App() -> impl IntoView {
                             <div id="details-pane">
                                 <ACDetails />
                                 <APDetails />
-                                <RouteList routes=routes stats=stats show_origin=show_origin />
+                                <RouteList
+                                    routes=routes
+                                    stats=stats
+                                    show_origin=show_origin
+                                    search_mode=search_mode
+                                />
                             </div>
                         </div>
                     </Show>

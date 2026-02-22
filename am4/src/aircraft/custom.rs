@@ -1,6 +1,7 @@
 use crate::aircraft::EnginePriority;
 use crate::aircraft::{Aircraft, AircraftError};
 use std::collections::HashSet;
+use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 
 /// An container holding the base [Aircraft] and its [Modification]s.
@@ -79,6 +80,48 @@ impl Default for Modification {
             mods: HashSet::new(),
             engine: EnginePriority(0),
         }
+    }
+}
+
+impl Modification {
+    pub fn is_empty(&self) -> bool {
+        self.engine.get() == 0 && self.mods.is_empty()
+    }
+}
+
+impl Display for Modification {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        if self.engine.get() != 0 {
+            write!(f, "{}", self.engine.get())?;
+        }
+
+        if self.mods.contains(&Modifier::Speed) {
+            f.write_str("s")?;
+        }
+        if self.mods.contains(&Modifier::Fuel) {
+            f.write_str("f")?;
+        }
+        if self.mods.contains(&Modifier::Co2) {
+            f.write_str("c")?;
+        }
+        if self.mods.contains(&Modifier::FourX) {
+            f.write_str("x")?;
+        }
+        if self.mods.contains(&Modifier::EasyBoost) {
+            f.write_str("e")?;
+        }
+
+        Ok(())
+    }
+}
+
+impl Display for CustomAircraft {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.aircraft.shortname)?;
+        if !self.modifiers.is_empty() {
+            write!(f, "[{}]", self.modifiers)?;
+        }
+        Ok(())
     }
 }
 

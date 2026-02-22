@@ -10,6 +10,7 @@ use leptos::prelude::*;
 pub fn APSearch(
     #[prop(into)] selected: RwSignal<Vec<Airport>>,
     #[prop(into)] active: RwSignal<Option<Airport>>,
+    #[prop(optional)] label: Option<&'static str>,
 ) -> impl IntoView {
     let database = expect_context::<StoredValue<Option<Data>>>();
 
@@ -101,9 +102,21 @@ pub fn APSearch(
         .into_any()
     };
 
+    let parse_token = Callback::new(move |token: String| {
+        database.with_value(|db| {
+            db.as_ref()
+                .and_then(|db| db.airports.search(&token).ok())
+                .cloned()
+        })
+    });
+
+    let serialize = Callback::new(|ap: Airport| ap.icao.to_string());
+
     view! {
-        <div id="ap-search">
-            <label>"Origin"</label>
+        <div class="ap-search">
+            <Show when=move || label.is_some_and(|s| !s.is_empty())>
+                <label>{label.unwrap_or_default()}</label>
+            </Show>
             <MultiSelect
                 selected=selected
                 active=active
@@ -111,6 +124,8 @@ pub fn APSearch(
                 placeholder="Search airports..."
                 render_option=render_option
                 render_pill=render_pill
+                serialize=serialize
+                parse_token=parse_token
             />
         </div>
     }

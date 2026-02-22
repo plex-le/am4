@@ -1,8 +1,8 @@
 use crate::console::UserLogger;
 use am4::user::{
-    AircraftLoad, AirportCodePref, Co2Price, Co2Training, FuelPrice, FuelTraining, GameMode,
-    HeavyTraining, LargeTraining, RepairTraining, RevenueLossTol, Settings, ValidationError,
-    WearTraining,
+    AircraftLoad, AirportCodePref, Co2Price, Co2Training, CsvTimeFormat, FuelPrice, FuelTraining,
+    GameMode, HeavyTraining, LargeTraining, RepairTraining, RevenueLossTol, Settings,
+    ValidationError, WearTraining,
 };
 use leptos::prelude::*;
 use leptos::wasm_bindgen::JsCast;
@@ -219,6 +219,35 @@ pub fn SettingsPanel() -> impl IntoView {
                                 }
                             />
                         </label>
+                        <div class="mode-toggle">
+                            <span>"CSV Time Format"</span>
+                            <div class="toggle-options">
+                                <button
+                                    class:active=move || {
+                                        settings.get().csv_time_format == CsvTimeFormat::HhMmSs
+                                    }
+                                    on:click=move |_| {
+                                        settings
+                                            .update(|s| s.csv_time_format = CsvTimeFormat::HhMmSs);
+                                        logger.info("updated setting 'csv time format': HH:MM:SS");
+                                    }
+                                >
+                                    "HH:MM:SS"
+                                </button>
+                                <button
+                                    class:active=move || {
+                                        settings.get().csv_time_format == CsvTimeFormat::Decimal
+                                    }
+                                    on:click=move |_| {
+                                        settings
+                                            .update(|s| s.csv_time_format = CsvTimeFormat::Decimal);
+                                        logger.info("updated setting 'csv time format': decimal");
+                                    }
+                                >
+                                    "Decimal"
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="setting-group">
