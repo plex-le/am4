@@ -128,6 +128,8 @@ impl<'a> ConcreteRoutes<'a> {
                     target_dist
                 };
 
+                let direct_requires_stopover = route.direct_distance.get() > ac.range as f32;
+
                 match Stopover::find_by_target_distance_lt(
                     self.config.airports.data(),
                     distances,
@@ -138,6 +140,13 @@ impl<'a> ConcreteRoutes<'a> {
                     target_dist,
                 ) {
                     Some((s, d)) => (Some(s), d),
+                    None if direct_requires_stopover => {
+                        self.errors.push(FailedRoute {
+                            destination: route.destination,
+                            error: ScheduleError::DistanceConstraint.into(),
+                        });
+                        continue;
+                    }
                     None => (None, route.direct_distance),
                 }
             } else {
