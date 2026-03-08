@@ -101,9 +101,6 @@ plugins:
               - "!__setstate__"
               - "!__str__"
       enable_inventory: true
-  - exclude:
-      glob:
-        - docs/assets/scripts/demand-research/old*
 
 markdown_extensions:
 - abbr

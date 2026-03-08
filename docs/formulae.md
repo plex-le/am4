@@ -374,11 +374,11 @@ Applicable for both <span class="easy">easy</span> and <span class="realism">rea
 
 $$
 \begin{align*}
-C_{1} &= (2625T + 4500)n_p \\
-C_{2} &= (3937.5T + 6750)n_p \\
-C_{3} &= (4987.5T + 8550)n_p \\
-C_{4} &= (6037.5T + 10350)n_p \\
-C_{\text{eco}} &= 8270n_p \\
+C_{1} &= (2625T + 4500)N_p \\
+C_{2} &= (3937.5T + 6750)N_p \\
+C_{3} &= (4987.5T + 8550)N_p \\
+C_{4} &= (6037.5T + 10350)N_p \\
+C_{\text{eco}} &= 8270N_p \\
 \end{align*}
 $$
 
@@ -386,7 +386,7 @@ where:
 
 - $C_{k}$: Cost of marketing campaign *k*
 - $T$: Campaign length, hours
-- $n_p$: Total amount of planes ever owned[^3]
+- $N_p$: Total number of planes ever owned[^3]
 
 ### Pax Carried
 
@@ -503,7 +503,7 @@ where:
 - $t_c$: CO₂ training amount (0-5)
 - $\text{ceil}(d, 2)$: total distance[^1], rounded up to 2 decimal places
 - $c_c$: CO₂ consumption of the aircraft. If modified with CO₂ efficiency, multiply by 0.9.
-- $y_l$, $j_l$, $f_l$ are the number of economy, business, and first class passenger loaded
+- $y_l$, $j_l$, $f_l$ are the number of economy, business, and first-class passengers loaded
 - $y_c$, $j_c$, $f_c$ are the number of economy, business, and first class seats
 - $CI$: cost index (0-200)
 
@@ -543,13 +543,13 @@ where:
 #### Pax, <span class="realism">Realism</span>
 
 $$
-C = (d \cdot n_p) + (y_c \cdot \lfloor 0.3d + 150 \rfloor) + (j_c \cdot \lfloor 0.6d + 500 \rfloor) + (f_c \cdot \lfloor 0.9d + 1000 \rfloor)
+C = (d \cdot N_p) + (y_c \cdot \lfloor 0.3d + 150 \rfloor) + (j_c \cdot \lfloor 0.6d + 500 \rfloor) + (f_c \cdot \lfloor 0.9d + 1000 \rfloor)
 $$
 
 where:
 
 - $d$: total distance[^1]
-- $n_p$: total amount of planes ever owned[^3]
+- $N_p$: total number of planes ever owned[^3]
 - $y_c$, $j_c$, $f_c$ are the number of economy, business, and first class seats
 
 ### Best Configuration
@@ -621,12 +621,12 @@ API: [utils.airport.Airport.hub_cost][]
 Applicable for both <span class="easy">easy</span> and <span class="realism">realism</span>.
 
 
-$$C_{k} = kp + k$$
+$$C = k(p+1)$$
 
 where:
 
-- $C_{k}$: Cost of hub with tier value *k* ($k$ is hardcoded)
-- $p$: Total amount of planes ever owned
+- $k$: base hub cost, varies across airports (recorded in our list of airports)
+- $p$: Total number of planes ever owned
 
 The maximum tier value is a capital route.
 
@@ -642,16 +642,16 @@ Applicable for both <span class="easy">easy</span> and <span class="realism">rea
 
 $$
 \begin{align*}
-T_{\text{regular}} &= 500n_l + 2000 \\
-T_{\text{highend}} &= 700n_l + 3600 \\
-T_{\text{exclusive}} &= 900n_l + 7200 \\
+T_{\text{regular}} &= 500N_l + 2000 \\
+T_{\text{highend}} &= 700N_l + 3600 \\
+T_{\text{exclusive}} &= 900N_l + 7200 \\
 \end{align*}
 $$
 
 where:
 
 - $T$: time needed to construct the lounge
-- $n_l$: number of lounges owned
+- $N_l$: number of lounges owned
 
 #### Construction cost
 
@@ -663,16 +663,16 @@ Applicable for both <span class="easy">easy</span> and <span class="realism">rea
 
 $$
 \begin{align*}
-C_{\text{regular}} &= 1500000n_l + 37500000 \\
-C_{\text{highend}} &= 5000000n_l + 125000000 \\
-C_{\text{exclusive}} &= 15000000n_l + 375000000 \\
+C_{\text{regular}} &= 1500000N_l + 37500000 \\
+C_{\text{highend}} &= 5000000N_l + 125000000 \\
+C_{\text{exclusive}} &= 15000000N_l + 375000000 \\
 \end{align*}
 $$
 
 where:
 
 - $C$: cost needed to construct the lounge
-- $n_l$: number of lounges owned
+- $N_l$: number of lounges owned
 
 ### Hangar expansion
 
@@ -777,6 +777,22 @@ where:
 - $T$: downtime (seconds)
 - $C$: [check cost][utils.aircraft.Aircraft.check_cost]
 
+### Resell Value
+
+Found: Mar 6 2026 (Obsidian Air)
+
+$$
+P_\text{sell} = \max\left(P - 2500h, 0.10P\right)
+$$
+
+where:
+
+- $P_\text{sell}$: resell aircraft value
+- $P$: original aircraft purchase price, with or without seat modifications, not including SFC upgrades.
+- $h$: total flight hours logged
+
+Note that all aircraft are delivered with 35 initial flight hours.
+
 ___
 
 ## Miscellaneous
@@ -803,7 +819,7 @@ $$
 
 where:
 
-- $y_l$, $j_l$, $f_l$ are the number of economy, business, and first class passenger loaded
+- $y_l$, $j_l$, $f_l$ are the number of economy, business, and first-class passengers loaded
 - $l_l$, $h_l$: actual load of large and heavy cargo (lbs)
 - $d$: total distance[^1] of the flight.
 - $l$: current level number
