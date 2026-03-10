@@ -1,4 +1,9 @@
 [build]
-# Disable Subresource Integrity (SRI) to avoid browser blocking when hashes mismatch
-sri_allow_none = true
+# Disable Subresource Integrity (SRI) to fix the browser blocking error "Failed to find a valid digest"
+# This is safer for web apps that might have assets served from dynamic environments.
 integrity = "none"
+
+[[hooks]]
+stage = "post_build"
+command = "uv"
+command_arguments = ["run", "../scripts/generate_pwa_sw.py"]
