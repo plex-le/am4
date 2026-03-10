@@ -1,0 +1,4 @@
+[build]
+# Disable Subresource Integrity (SRI) to avoid browser blocking when hashes mismatch
+sri_allow_none = true
+integrity = "none"
