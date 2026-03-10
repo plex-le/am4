@@ -1,0 +1,42 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install Trunk
+        run: |
+          wget -qO- https://github.com/trunk-rs/trunk/releases/download/v0.21.14/trunk-x86_64-unknown-linux-gnu.tar.gz | tar -xzf-
+          sudo mv trunk /usr/local/bin/
+
+      - name: Set up uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      - name: Build am4-web
+        run: |
+          cd am4-web
+          trunk build --release --minify
+          cp vercel.json dist/vercel.json || true
+
+      - name: Deploy to gh-deploy branch
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: am4-web/dist
+          branch: gh-deploy
+          token: ${{ secrets.GITHUB_TOKEN }}
