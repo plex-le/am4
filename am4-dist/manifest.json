@@ -1,0 +1,54 @@
+{
+    "name": "AM4Help",
+    "short_name": "AM4Help",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#383338",
+    "theme_color": "#383338",
+    "icons": [
+        {
+            "src": "assets/img/icons/logo-32.png",
+            "sizes": "32x32",
+            "type": "image/png"
+        },
+        {
+            "src": "assets/img/icons/logo-196.png",
+            "sizes": "64x64",
+            "type": "image/png"
+        },
+        {
+            "src": "assets/img/icons/logo-512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        },
+        {
+            "src": "assets/img/icons/logo.svg",
+            "sizes": "any",
+            "type": "image/svg+xml"
+        },
+        {
+            "src": "assets/img/icons/logo-maskable-32.png",
+            "sizes": "32x32",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "assets/img/icons/logo-maskable-196.png",
+            "sizes": "64x64",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "assets/img/icons/logo-maskable-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "assets/img/icons/logo-maskable.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "maskable"
+        }
+    ]
+}
