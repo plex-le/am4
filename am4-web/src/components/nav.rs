@@ -8,6 +8,7 @@ use leptos::web_sys;
 pub enum Page {
     Calculator,
     Help,
+    ResultsGrid,
 }
 
 #[component]

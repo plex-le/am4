@@ -1064,6 +1064,32 @@ pub fn RouteList(
                 </span>
                 <div class="pagination">
                     <button
+                        class="grid-view-btn"
+                        title="Grid View"
+                        on:click=move |_| {
+                            let page = expect_context::<RwSignal<crate::components::nav::Page>>();
+                            page.set(crate::components::nav::Page::ResultsGrid);
+                        }
+                    >
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        >
+                            <rect width="7" height="7" x="3" y="3" rx="1" />
+                            <rect width="7" height="7" x="14" y="3" rx="1" />
+                            <rect width="7" height="7" x="14" y="14" rx="1" />
+                            <rect width="7" height="7" x="3" y="14" rx="1" />
+                        </svg>
+                        "Grid"
+                    </button>
+                    <button
                         class="download"
                         title="Download CSV"
                         on:click=move |_| {
@@ -1464,6 +1490,228 @@ pub fn FerryRouteCard(route: WebFerryRoute, show_origin: Signal<bool>) -> impl I
                 {fmt_dist(route.direct_distance.get())} " (" {ft_str} ")" " ⋅ Market: "
                 {route.destination.market} "%" <br /> "Fuel: " {fmt_money(fuel_cost)} " ("
                 {format_thousands(route.fuel)} " lbs)" " ⋅ Profit: " {fmt_money(route.profit)}
+            </div>
+        </div>
+    }
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum GridTab {
+    Replacement,
+    Top200,
+    Extra,
+}
+
+#[component]
+pub fn ResultsGridView(
+    #[prop(into)] routes: ReadSignal<Vec<WebRoute>>,
+    #[prop(into)] _show_origin: Signal<bool>,
+) -> impl IntoView {
+    let page = expect_context::<RwSignal<crate::components::nav::Page>>();
+    let active_tab = RwSignal::new(GridTab::Top200);
+    let hub_filter = RwSignal::new(String::from("All"));
+    let search_query = RwSignal::new(String::new());
+
+    let hubs = Memo::new(move |_| {
+        let mut h = vec![String::from("All")];
+        let all_routes = routes.get();
+        for r in all_routes {
+            let origin_iata = match r {
+                WebRoute::Scheduled(rs) => rs.origin.iata.to_string(),
+                WebRoute::Ferry(rf) => rf.origin.iata.to_string(),
+            };
+            if !h.contains(&origin_iata) {
+                h.push(origin_iata);
+            }
+        }
+        h
+    });
+
+    let filtered_routes = Memo::new(move |_| {
+        let all = routes.get();
+        let current_hub = hub_filter.get();
+        let query = search_query.get().to_lowercase();
+        
+        all.into_iter().filter(|r| {
+            let (origin_iata, dest_name, dest_iata) = match r {
+                WebRoute::Scheduled(rs) => (rs.origin.iata.to_string(), rs.destination.name.to_string().to_lowercase(), rs.destination.iata.to_string().to_lowercase()),
+                WebRoute::Ferry(rf) => (rf.origin.iata.to_string(), rf.destination.name.to_string().to_lowercase(), rf.destination.iata.to_string().to_lowercase()),
+            };
+            
+            let hub_match = current_hub == "All" || origin_iata == current_hub;
+            let query_match = query.is_empty() || dest_name.contains(&query) || dest_iata.contains(&query);
+            
+            hub_match && query_match
+        }).collect::<Vec<_>>()
+    });
+
+    let tab_routes = Memo::new(move |_: Option<&Vec<WebRoute>>| {
+        let filtered = filtered_routes.get();
+        match active_tab.get() {
+            GridTab::Replacement => filtered.into_iter().take(20).collect(),
+            GridTab::Top200 => filtered.into_iter().skip(20).take(200).collect(),
+            GridTab::Extra => filtered.into_iter().skip(220).collect(),
+        }
+    });
+
+    view! {
+        <div id="results-grid-view">
+            <div class="grid-header">
+                <div class="title-row">
+                    <button class="back-btn" on:click=move |_| page.set(crate::components::nav::Page::Calculator)>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                    </button>
+                    <h1>"AM4 ROUTES"</h1>
+                    <div class="header-controls">
+                        <label class="used-toggle">
+                            "Used" <input type="checkbox" />
+                        </label>
+                        <div class="search-box">
+                            <input 
+                                type="text" 
+                                placeholder="Search..." 
+                                prop:value=search_query
+                                on:input=move |ev| search_query.set(event_target_value(&ev))
+                            />
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="tabs-row">
+                    <div class="tabs">
+                        <button 
+                            class:active=move || active_tab.get() == GridTab::Replacement
+                            on:click=move |_| active_tab.set(GridTab::Replacement)
+                        >
+                            "1:1 更换"
+                        </button>
+                        <button 
+                            class:active=move || active_tab.get() == GridTab::Top200
+                            on:click=move |_| active_tab.set(GridTab::Top200)
+                        >
+                            "新增 (Top 200)"
+                        </button>
+                        <button 
+                            class:active=move || active_tab.get() == GridTab::Extra
+                            on:click=move |_| active_tab.set(GridTab::Extra)
+                        >
+                            "备选 (Extra)"
+                        </button>
+                    </div>
+                </div>
+
+                <div class="filter-row">
+                    <label>
+                        "HUB FILTER"
+                        <select on:change=move |ev| hub_filter.set(event_target_value(&ev))>
+                            {move || hubs.get().into_iter().map(|h| view! { <option value=h.clone()>{h.clone()}</option> }).collect::<Vec<_>>()}
+                        </select>
+                    </label>
+                </div>
+            </div>
+
+            <div class="grid-content">
+                <For
+                    each=move || tab_routes.get()
+                    key=|_| uuid::Uuid::new_v4()
+                    children=move |route| {
+                        match route {
+                            WebRoute::Scheduled(r) => view! { <GridCard route=r /> }.into_any(),
+                            WebRoute::Ferry(_) => view! { <div>"Ferry not supported in grid"</div> }.into_any(),
+                        }
+                    }
+                />
+            </div>
+        </div>
+    }
+}
+
+fn copy_to_clipboard(text: String) {
+    if let Some(window) = web_sys::window() {
+        let _ = window.navigator().clipboard().write_text(&text);
+    }
+}
+
+#[component]
+fn GridCard(route: WebScheduledRoute) -> impl IntoView {
+    let _is_cargo = matches!(route.config, ConfigVariant::Cargo(_));
+    let used = RwSignal::new(false);
+    
+    let stats_view = match route.ticket {
+        Ticket::Pax(t) | Ticket::VIP(t) => {
+            view! {
+                <div class="stat y" on:click=move |_| copy_to_clipboard(t.y.to_string())>
+                    <span class="label">"Y"</span>
+                    <span class="val">{format_thousands(route.demand.y)}</span>
+                    <span class="price">"$" {format_thousands(t.y as usize)}</span>
+                </div>
+                <div class="stat j" on:click=move |_| copy_to_clipboard(t.j.to_string())>
+                    <span class="label">"J"</span>
+                    <span class="val">{format_thousands(route.demand.j)}</span>
+                    <span class="price">"$" {format_thousands(t.j as usize)}</span>
+                </div>
+                <div class="stat f" on:click=move |_| copy_to_clipboard(t.f.to_string())>
+                    <span class="label">"F"</span>
+                    <span class="val">{format_thousands(route.demand.f)}</span>
+                    <span class="price">"$" {format_thousands(t.f as usize)}</span>
+                </div>
+            }.into_any()
+        }
+        Ticket::Cargo(t) => {
+            let d: CargoDemand = (&route.demand).into();
+            view! {
+                <div class="stat" on:click=move |_| copy_to_clipboard(t.l.to_string())>
+                    <span class="label">"L"</span>
+                    <span class="val">{format_thousands(d.l)}</span>
+                    <span class="price">"$" {format_thousands(t.l as usize)}</span>
+                </div>
+                <div class="stat" on:click=move |_| copy_to_clipboard(t.h.to_string())>
+                    <span class="label">"H"</span>
+                    <span class="val">{format_thousands(d.h)}</span>
+                    <span class="price">"$" {format_thousands(t.h as usize)}</span>
+                </div>
+            }.into_any()
+        }
+    };
+
+    view! {
+        <div class="grid-card" class:used=used>
+            <div class="card-badge" on:click=move |_| used.update(|u| *u = !*u)>
+                "TOP RECOMMENDATION" 
+                <div class="check-icon">
+                    {move || if used.get() { "✓" } else { " " }}
+                </div>
+            </div>
+            <div class="card-header">
+                <div class="side-block">
+                    <span class="label">"FROM"</span>
+                    <span class="code">{route.origin.iata.to_string()}</span>
+                    <span class="name">{route.origin.name.to_string()}</span>
+                </div>
+                
+                {route.stopover.map(|s| view! {
+                    <div class="via-block">
+                        <span class="label">"VIA"</span>
+                        <span class="code">{s.iata.to_string()}</span>
+                        <span class="name">{s.name.to_string()}</span>
+                        <span class="country">{s.country.to_string()}</span>
+                    </div>
+                })}
+
+                <div class="dist-block">
+                    <span class="dist">{format_thousands(route.direct_distance.get())} " km"</span>
+                    <div class="plane-icon">"✈"</div>
+                </div>
+                <div class="side-block text-right">
+                    <span class="label">"TO"</span>
+                    <span class="code">{route.destination.iata.to_string()}</span>
+                    <span class="name">{route.destination.name.to_string()}</span>
+                    <span class="country">{route.destination.country.to_string()}</span>
+                </div>
+            </div>
+            
+            <div class="card-stats">
+                {stats_view}
             </div>
         </div>
     }

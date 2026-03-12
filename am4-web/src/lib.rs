@@ -156,6 +156,10 @@ pub fn App() -> impl IntoView {
                     <Help />
                 </Show>
 
+                <Show when=move || page.get() == Page::ResultsGrid>
+                    <components::route::ResultsGridView routes=routes _show_origin=show_origin />
+                </Show>
+
                 <Show when=move || page.get() == Page::Calculator>
                     <ConsoleView />
                     <SettingsPanel />
