@@ -1140,6 +1140,22 @@ main {
                     align-items: center;
                     gap: 0.25rem;
                     min-width: 70px;
+                    
+                    &.clickable {
+                        cursor: pointer;
+                        transition: all 0.1s;
+                        border-radius: 4px;
+                        padding: 0 4px;
+                        margin-left: -4px;
+
+                        &:hover {
+                            background-color: var(--bg-hover);
+                        }
+
+                        &:active {
+                            transform: scale(0.95);
+                        }
+                    }
 
                     .letter {
                         font-weight: bold;

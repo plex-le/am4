@@ -1164,6 +1164,7 @@ struct StatItem {
     label: &'static str,
     val: String,
     class: &'static str,
+    copy_val: Option<String>,
 }
 
 #[component]
@@ -1201,8 +1202,16 @@ pub fn RouteCard(route: WebScheduledRoute, show_origin: Signal<bool>) -> impl In
                 {items
                     .into_iter()
                     .map(|item| {
+                        let copy_val = item.copy_val.clone();
                         view! {
-                            <div class="stat-pair">
+                            <div 
+                                class=format!("stat-pair {}", if item.copy_val.is_some() { "clickable" } else { "" })
+                                on:click=move |_| {
+                                    if let Some(val) = &copy_val {
+                                        copy_to_clipboard(val.clone());
+                                    }
+                                }
+                            >
                                 <span class=format!("letter {}", item.class)>{item.label}</span>
                                 <span class="val">{item.val}</span>
                             </div>
@@ -1220,11 +1229,13 @@ pub fn RouteCard(route: WebScheduledRoute, show_origin: Signal<bool>) -> impl In
                 label: "L",
                 val: format_thousands(d.l),
                 class: "l",
+                copy_val: None,
             },
             StatItem {
                 label: "H",
                 val: format_thousands(d.h),
                 class: "h",
+                copy_val: None,
             },
         ]
     } else {
@@ -1233,16 +1244,19 @@ pub fn RouteCard(route: WebScheduledRoute, show_origin: Signal<bool>) -> impl In
                 label: "Y",
                 val: format_thousands(route.demand.y),
                 class: "y",
+                copy_val: None,
             },
             StatItem {
                 label: "J",
                 val: format_thousands(route.demand.j),
                 class: "j",
+                copy_val: None,
             },
             StatItem {
                 label: "F",
                 val: format_thousands(route.demand.f),
                 class: "f",
+                copy_val: None,
             },
         ]
     };
@@ -1255,11 +1269,13 @@ pub fn RouteCard(route: WebScheduledRoute, show_origin: Signal<bool>) -> impl In
                 label: "L",
                 val: format!("{}%", c.l),
                 class: "l",
+                copy_val: None,
             },
             StatItem {
                 label: "H",
                 val: format!("{}%", c.h),
                 class: "h",
+                copy_val: None,
             },
         ],
         ConfigVariant::Pax(c) => vec![
@@ -1267,16 +1283,19 @@ pub fn RouteCard(route: WebScheduledRoute, show_origin: Signal<bool>) -> impl In
                 label: "Y",
                 val: c.y.to_string(),
                 class: "y",
+                copy_val: None,
             },
             StatItem {
                 label: "J",
                 val: c.j.to_string(),
                 class: "j",
+                copy_val: None,
             },
             StatItem {
                 label: "F",
                 val: c.f.to_string(),
                 class: "f",
+                copy_val: None,
             },
         ],
     };
@@ -1287,11 +1306,13 @@ pub fn RouteCard(route: WebScheduledRoute, show_origin: Signal<bool>) -> impl In
                 label: "L",
                 val: format!("${:.2}", t.l),
                 class: "l",
+                copy_val: Some(t.l.to_string()),
             },
             StatItem {
                 label: "H",
                 val: format!("${:.2}", t.h),
                 class: "h",
+                copy_val: Some(t.h.to_string()),
             },
         ],
         Ticket::Pax(t) | Ticket::VIP(t) => vec![
@@ -1299,16 +1320,19 @@ pub fn RouteCard(route: WebScheduledRoute, show_origin: Signal<bool>) -> impl In
                 label: "Y",
                 val: format_thousands(t.y),
                 class: "y",
+                copy_val: Some(t.y.to_string()),
             },
             StatItem {
                 label: "J",
                 val: format_thousands(t.j),
                 class: "j",
+                copy_val: Some(t.j.to_string()),
             },
             StatItem {
                 label: "F",
                 val: format_thousands(t.f),
                 class: "f",
+                copy_val: Some(t.f.to_string()),
             },
         ],
     };
